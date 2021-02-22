@@ -1,6 +1,6 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
-
+import sys
 import json
 import logging
 import time
@@ -14,7 +14,6 @@ from model import CNN
 from nni.nas.pytorch.callbacks import ArchitectureCheckpoint, LRSchedulerCallback
 from utils import accuracy
 
-
 logger = logging.getLogger('nni')
 
 if __name__ == "__main__":
@@ -26,19 +25,22 @@ if __name__ == "__main__":
     parser.add_argument("--channels", default=16, type=int)
     parser.add_argument("--unrolled", default=False, action="store_true")
     parser.add_argument("--visualization", default=False, action="store_true")
-    parser.add_argument("--v1", default=False, action="store_true")
+    parser.add_argument("--supervised", default=False, action="store_true")
     args = parser.parse_args()
-
-    dataset_train, dataset_valid = datasets.get_dataset("cifar10")
-
-    model = CNN(32, 3, args.channels, 10, args.layers)
+    
+    n_classes = 10 if args.supervised else 128
+    model = CNN(32, 3, args.channels, n_classes, args.layers)
     criterion = nn.CrossEntropyLoss()
 
     optim = torch.optim.SGD(model.parameters(), 0.025, momentum=0.9, weight_decay=3.0E-4)
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, args.epochs, eta_min=0.001)
 
-    if args.v1:
+    if args.supervised:
         from nni.algorithms.nas.pytorch.darts import DartsTrainer
+        dataset = datasets.ContrastiveLearningDataset('./data')
+        dataset_train = dataset.get_dataset('cifar10', 1)
+        _, dataset_valid = datasets.get_dataset("cifar10")
+#         dataset_train, dataset_valid = datasets.get_dataset("cifar10")
         trainer = DartsTrainer(model,
                                loss=criterion,
                                metrics=lambda output, target: accuracy(output, target, topk=(1,)),
@@ -54,20 +56,27 @@ if __name__ == "__main__":
             trainer.enable_visualization()
 
         trainer.train()
+        trainer.validate()
+        trainer.export('checkpoint.json')
+
     else:
-        from nni.retiarii.trainer.pytorch import DartsTrainer
-        trainer = DartsTrainer(
-            model=model,
-            loss=criterion,
-            metrics=lambda output, target: accuracy(output, target, topk=(1,)),
-            optimizer=optim,
-            num_epochs=args.epochs,
-            dataset=dataset_train,
-            batch_size=args.batch_size,
-            log_frequency=args.log_frequency,
-            unrolled=args.unrolled
-        )
-        trainer.fit()
-        final_architecture = trainer.export()
-        print('Final architecture:', trainer.export())
-        json.dump(trainer.export(), open('checkpoint.json', 'w'))
+        sys.path.append('../../../nni/algorithms/nas/pytorch/')
+        from darts import SSLDartsTrainer
+        model = CNN(32, 3, args.channels, 128, args.layers)
+        dataset = datasets.ContrastiveLearningDataset('./data')
+        dataset_train, dataset_valid = dataset.get_dataset()
+#         _, dataset_valid = datasets.get_dataset("cifar10")
+
+        trainer = SSLDartsTrainer(model,
+                       loss=criterion,
+                       metrics=lambda output, target: accuracy(output, target, topk=(1,)),
+                       optimizer=optim,
+                       num_epochs=args.epochs,
+                       dataset_train=dataset_train,
+                       dataset_valid=dataset_valid,
+                       batch_size=args.batch_size,
+                       log_frequency=args.log_frequency,
+                       callbacks=[LRSchedulerCallback(lr_scheduler), ArchitectureCheckpoint("./checkpoints")])
+        trainer.train(validate=False)
+#         trainer.validate()
+        trainer.export('ssl_checkpoint.json')

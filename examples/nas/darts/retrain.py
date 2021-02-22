@@ -39,7 +39,7 @@ def train(config, train_loader, model, optimizer, criterion, epoch):
         bs = x.size(0)
 
         optimizer.zero_grad()
-        logits, aux_logits = model(x)
+        logits = model(x)
         loss = criterion(logits, y)
         if config.aux_weight > 0.:
             loss += config.aux_weight * criterion(aux_logits, y)
@@ -115,12 +115,21 @@ if __name__ == "__main__":
     parser.add_argument("--workers", default=4)
     parser.add_argument("--grad-clip", default=5., type=float)
     parser.add_argument("--arc-checkpoint", default="./checkpoints/epoch_0.json")
+    parser.add_argument("--supervised", default=False)
 
     args = parser.parse_args()
-    dataset_train, dataset_valid = datasets.get_dataset("cifar10", cutout_length=16)
-
-    model = CNN(32, 3, 36, 10, args.layers, auxiliary=True)
-    apply_fixed_architecture(model, args.arc_checkpoint)
+    dataset_train, dataset_valid = datasets.get_dataset("cifar10")#, cutout_length=16)
+    
+    if args.supervised:
+        model = CNN(32, 3, 36, 10, args.layers, auxiliary=False)
+        apply_fixed_architecture(model, args.arc_checkpoint)
+    else:
+        model = CNN(32, 3, 36, 128, args.layers, auxiliary=False)
+        apply_fixed_architecture(model, args.arc_checkpoint)
+        for param in model.parameters():
+            param.requires_grad = False
+        model = nn.Sequential(model, nn.ReLU(), nn.Linear(128, 10))
+        
     criterion = nn.CrossEntropyLoss()
 
     model.to(device)
@@ -128,12 +137,22 @@ if __name__ == "__main__":
 
     optimizer = torch.optim.SGD(model.parameters(), 0.025, momentum=0.9, weight_decay=3.0E-4)
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.epochs, eta_min=1E-6)
-
-    train_loader = torch.utils.data.DataLoader(dataset_train,
-                                               batch_size=args.batch_size,
-                                               shuffle=True,
-                                               num_workers=args.workers,
-                                               pin_memory=True)
+    
+    if args.supervised:
+        train_loader = torch.utils.data.DataLoader(dataset_train,
+                                           batch_size=args.batch_size,
+                                           shuffle=True,
+                                           num_workers=args.workers,
+                                           pin_memory=True)
+    else:
+        n_train = len(dataset_train)
+        split = n_train #// 2
+        indices = list(range(n_train))
+        train_sampler = torch.utils.data.sampler.SubsetRandomSampler(indices[:split])
+        train_loader = torch.utils.data.DataLoader(dataset_train,
+                                                   batch_size=args.batch_size,
+                                                   sampler=train_sampler,
+                                                   num_workers=args.workers)
     valid_loader = torch.utils.data.DataLoader(dataset_valid,
                                                batch_size=args.batch_size,
                                                shuffle=False,
@@ -143,7 +162,7 @@ if __name__ == "__main__":
     best_top1 = 0.
     for epoch in range(args.epochs):
         drop_prob = args.drop_path_prob * epoch / args.epochs
-        model.drop_path_prob(drop_prob)
+#         model.drop_path_prob(drop_prob)
 
         # training
         train(args, train_loader, model, optimizer, criterion, epoch)

@@ -4,8 +4,10 @@
 import numpy as np
 import torch
 from torchvision import transforms
-from torchvision.datasets import CIFAR10
-
+from torchvision.datasets import CIFAR10, STL10
+from torchvision.transforms import transforms
+from gaussian_blur import GaussianBlur
+from view_generator import ContrastiveLearningViewGenerator
 
 class Cutout(object):
     def __init__(self, length):
@@ -39,7 +41,7 @@ def get_dataset(cls, cutout_length=0):
     ]
     normalize = [
         transforms.ToTensor(),
-        transforms.Normalize(MEAN, STD)
+#         transforms.Normalize(MEAN, STD)
     ]
     cutout = []
     if cutout_length > 0:
@@ -54,3 +56,30 @@ def get_dataset(cls, cutout_length=0):
     else:
         raise NotImplementedError
     return dataset_train, dataset_valid
+
+class ContrastiveLearningDataset:
+    def __init__(self, root_folder):
+        self.root_folder = root_folder
+
+    @staticmethod
+    def get_simclr_pipeline_transform(size, s=1):
+        """Return a set of data augmentation transformations as described in the SimCLR paper."""
+        color_jitter = transforms.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
+        data_transforms = transforms.Compose([transforms.RandomResizedCrop(size=size),
+                                              transforms.RandomHorizontalFlip(),
+                                              transforms.RandomApply([color_jitter], p=0.8),
+                                              transforms.RandomGrayscale(p=0.2),
+                                              GaussianBlur(kernel_size=int(0.1 * size)),
+                                              transforms.ToTensor()])
+        return data_transforms
+
+    def get_dataset(self):
+        return CIFAR10(self.root_folder, train=True,
+                  transform=ContrastiveLearningViewGenerator(
+                  self.get_simclr_pipeline_transform(32),
+                  2),
+                  download=True), CIFAR10(self.root_folder, train=False,
+                  transform=ContrastiveLearningViewGenerator(
+                  self.get_simclr_pipeline_transform(32),
+                  2),
+                  download=True)

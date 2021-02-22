@@ -9,7 +9,7 @@ import time
 import socket
 import string
 import random
-import ruamel.yaml as yaml
+import ruamel_yaml as yaml
 import psutil
 import filelock
 import glob
