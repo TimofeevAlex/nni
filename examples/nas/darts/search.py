@@ -30,6 +30,9 @@ if __name__ == "__main__":
     
     n_classes = 10 if args.supervised else 128
     model = CNN(32, 3, args.channels, n_classes, args.layers)
+    if not args.supervised:
+        model.linear = nn.Sequential(nn.Linear(model.linear.in_features, model.linear.in_features), nn.ReLU(), model.linear)
+    
     criterion = nn.CrossEntropyLoss()
 
     optim = torch.optim.SGD(model.parameters(), 0.025, momentum=0.9, weight_decay=3.0E-4)
@@ -62,7 +65,6 @@ if __name__ == "__main__":
     else:
         sys.path.append('../../../nni/algorithms/nas/pytorch/')
         from darts import SSLDartsTrainer
-        model = CNN(32, 3, args.channels, 128, args.layers)
         dataset = datasets.ContrastiveLearningDataset('./data')
         dataset_train, dataset_valid = dataset.get_dataset()
 #         _, dataset_valid = datasets.get_dataset("cifar10")

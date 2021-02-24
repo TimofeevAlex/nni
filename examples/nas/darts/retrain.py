@@ -8,9 +8,11 @@ from argparse import ArgumentParser
 import torch
 import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
+import torch.nn.functional as F
 
 import datasets
 import utils
+from utils import accuracy
 from model import CNN
 from nni.nas.pytorch.fixed import apply_fixed_architecture
 from nni.nas.pytorch.utils import AverageMeter
@@ -21,6 +23,58 @@ logger = logging.getLogger('nni')
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 writer = SummaryWriter()
 
+
+def info_nce_loss(features, config):
+        labels = torch.cat([torch.arange(config.batch_size) for i in range(2)], dim=0)
+        labels = (labels.unsqueeze(0) == labels.unsqueeze(1)).float()
+        labels = labels.to(device)
+
+        features = F.normalize(features, dim=1)
+
+        similarity_matrix = torch.matmul(features, features.T)
+        # assert similarity_matrix.shape == (
+        #     self.args.n_views * self.args.batch_size, self.args.n_views * self.args.batch_size)
+        # assert similarity_matrix.shape == labels.shape
+
+        # discard the main diagonal from both: labels and similarities matrix
+        mask = torch.eye(labels.shape[0], dtype=torch.bool).to(device)
+        
+        labels = labels[~mask].view(labels.shape[0], -1)
+        
+        similarity_matrix = similarity_matrix[~mask].view(similarity_matrix.shape[0], -1)
+        # assert similarity_matrix.shape == labels.shape
+        # select and combine multiple positives
+        positives = similarity_matrix[labels.bool()].view(labels.shape[0], -1)
+
+        # select only the negatives the negatives
+        negatives = similarity_matrix[~labels.bool()].view(similarity_matrix.shape[0], -1)
+
+        logits = torch.cat([positives, negatives], dim=1)
+        labels = torch.zeros(logits.shape[0], dtype=torch.long).to(device)
+
+        logits = logits / config.temperature
+        return logits, labels
+    
+def ssl_train(config, train_loader, model, optimizer, criterion, epoch):
+    model.train()
+    losses = AverageMeter("losses")
+    for step, (trn_X, _) in enumerate(train_loader):
+        trn_X = torch.cat(trn_X, dim=0)
+        trn_X = trn_X.to(device)
+
+
+        optimizer.zero_grad()
+        features = model(trn_X)
+        logits, labels = info_nce_loss(features, config)
+        loss = criterion(logits, labels)
+        loss.backward()
+        nn.utils.clip_grad_norm_(model.parameters(), 5.)  # gradient clipping
+        optimizer.step()
+
+        losses.update(loss.item(), config.batch_size)
+        if config.log_frequency is not None and step % config.log_frequency == 0:
+            logger.info("Train: [{:3d}/{}] Step {:03d}/{:03d} Loss {losses.avg:.3f} ".format(
+                        epoch + 1, config.epochs, step, len(train_loader) - 1, losses=losses))
 
 def train(config, train_loader, model, optimizer, criterion, epoch):
     top1 = AverageMeter("top1")
@@ -115,21 +169,15 @@ if __name__ == "__main__":
     parser.add_argument("--workers", default=4)
     parser.add_argument("--grad-clip", default=5., type=float)
     parser.add_argument("--arc-checkpoint", default="./checkpoints/epoch_0.json")
-    parser.add_argument("--supervised", default=False)
+    parser.add_argument("--temperature", default=0.07, type=float)
 
     args = parser.parse_args()
-    dataset_train, dataset_valid = datasets.get_dataset("cifar10")#, cutout_length=16)
     
-    if args.supervised:
-        model = CNN(32, 3, 36, 10, args.layers, auxiliary=False)
-        apply_fixed_architecture(model, args.arc_checkpoint)
-    else:
-        model = CNN(32, 3, 36, 128, args.layers, auxiliary=False)
-        apply_fixed_architecture(model, args.arc_checkpoint)
-        for param in model.parameters():
-            param.requires_grad = False
-        model = nn.Sequential(model, nn.ReLU(), nn.Linear(128, 10))
-        
+
+    model = CNN(32, args.layers, 36, 128, args.layers, auxiliary=False)
+    model.linear = nn.Sequential(nn.Linear(model.linear.in_features, model.linear.in_features), nn.ReLU(), model.linear)
+    apply_fixed_architecture(model, args.arc_checkpoint)
+   
     criterion = nn.CrossEntropyLoss()
 
     model.to(device)
@@ -138,6 +186,27 @@ if __name__ == "__main__":
     optimizer = torch.optim.SGD(model.parameters(), 0.025, momentum=0.9, weight_decay=3.0E-4)
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.epochs, eta_min=1E-6)
     
+    dataset = datasets.ContrastiveLearningDataset('./data')
+    dataset_train, _ = dataset.get_dataset()
+    train_loader = torch.utils.data.DataLoader(dataset_train,
+                                                batch_size=args.batch_size,
+                                                num_workers=args.workers,
+                                                drop_last=True)
+    for epoch in range(args.epochs):
+        ssl_train(args, train_loader, model, optimizer, criterion, epoch)
+    
+    # SUPERVISED
+    for param in model.parameters():
+        param.requires_grad = False
+    model = nn.Sequential(model, nn.ReLU(), nn.Linear(128, 10))
+    dataset_train, dataset_valid = datasets.get_dataset("cifar10")# FIX TO 10%
+    criterion = nn.CrossEntropyLoss()
+
+    model.to(device)
+    criterion.to(device)
+
+    optimizer = torch.optim.SGD(model.parameters(), 0.025, momentum=0.9, weight_decay=3.0E-4)
+    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.epochs, eta_min=1E-6)
     if args.supervised:
         train_loader = torch.utils.data.DataLoader(dataset_train,
                                            batch_size=args.batch_size,
@@ -161,7 +230,7 @@ if __name__ == "__main__":
 
     best_top1 = 0.
     for epoch in range(args.epochs):
-        drop_prob = args.drop_path_prob * epoch / args.epochs
+#         drop_prob = args.drop_path_prob * epoch / args.epochs
 #         model.drop_path_prob(drop_prob)
 
         # training
