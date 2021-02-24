@@ -14,6 +14,7 @@ from model import CNN
 from nni.nas.pytorch.callbacks import ArchitectureCheckpoint, LRSchedulerCallback
 from utils import accuracy
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 logger = logging.getLogger('nni')
 
 if __name__ == "__main__":
@@ -34,8 +35,8 @@ if __name__ == "__main__":
         model.linear = nn.Sequential(nn.Linear(model.linear.in_features, model.linear.in_features), nn.ReLU(), model.linear)
     
     criterion = nn.CrossEntropyLoss()
-    model.to(device)
-    criterion.to(device)
+#     model.to(device)
+#     criterion.to(device)
     optim = torch.optim.SGD(model.parameters(), 0.025, momentum=0.9, weight_decay=3.0E-4)
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, args.epochs, eta_min=0.001)
 
@@ -79,6 +80,7 @@ if __name__ == "__main__":
                        dataset_valid=dataset_valid,
                        batch_size=args.batch_size,
                        log_frequency=args.log_frequency,
+                       device=device
                        callbacks=[LRSchedulerCallback(lr_scheduler), ArchitectureCheckpoint("./checkpoints")])
         trainer.train(validate=False)
 #         trainer.validate()
