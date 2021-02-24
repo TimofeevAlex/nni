@@ -34,7 +34,8 @@ if __name__ == "__main__":
         model.linear = nn.Sequential(nn.Linear(model.linear.in_features, model.linear.in_features), nn.ReLU(), model.linear)
     
     criterion = nn.CrossEntropyLoss()
-
+    model.to(device)
+    criterion.to(device)
     optim = torch.optim.SGD(model.parameters(), 0.025, momentum=0.9, weight_decay=3.0E-4)
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, args.epochs, eta_min=0.001)
 
