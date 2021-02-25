@@ -170,11 +170,11 @@ if __name__ == "__main__":
     parser.add_argument("--grad-clip", default=5., type=float)
     parser.add_argument("--arc-checkpoint", default="./checkpoints/epoch_0.json")
     parser.add_argument("--temperature", default=0.07, type=float)
+    parser.add_argument("--channels", default=36, type=int)
 
     args = parser.parse_args()
-    
 
-    model = CNN(32, args.layers, 36, 128, args.layers, auxiliary=False)
+    model = CNN(32, 3, args.channels, 128, args.layers, auxiliary=False)
     model.linear = nn.Sequential(nn.Linear(model.linear.in_features, model.linear.in_features), nn.ReLU(), model.linear)
     apply_fixed_architecture(model, args.arc_checkpoint)
    
@@ -207,21 +207,15 @@ if __name__ == "__main__":
 
     optimizer = torch.optim.SGD(model.parameters(), 0.025, momentum=0.9, weight_decay=3.0E-4)
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.epochs, eta_min=1E-6)
-    if args.supervised:
-        train_loader = torch.utils.data.DataLoader(dataset_train,
-                                           batch_size=args.batch_size,
-                                           shuffle=True,
-                                           num_workers=args.workers,
-                                           pin_memory=True)
-    else:
-        n_train = len(dataset_train)
-        split = n_train #// 2
-        indices = list(range(n_train))
-        train_sampler = torch.utils.data.sampler.SubsetRandomSampler(indices[:split])
-        train_loader = torch.utils.data.DataLoader(dataset_train,
-                                                   batch_size=args.batch_size,
-                                                   sampler=train_sampler,
-                                                   num_workers=args.workers)
+  
+    n_train = len(dataset_train)
+    split = n_train #// 2
+    indices = list(range(n_train))
+    train_sampler = torch.utils.data.sampler.SubsetRandomSampler(indices[:split])
+    train_loader = torch.utils.data.DataLoader(dataset_train,
+                                                batch_size=args.batch_size,
+                                                sampler=train_sampler,
+                                                num_workers=args.workers)
     valid_loader = torch.utils.data.DataLoader(dataset_valid,
                                                batch_size=args.batch_size,
                                                shuffle=False,
