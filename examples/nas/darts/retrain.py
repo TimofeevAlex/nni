@@ -172,7 +172,6 @@ if __name__ == "__main__":
     parser.add_argument("--channels", default=36, type=int)
 
     args = parser.parse_args()
-    
 
     model = CNN(32, 3, args.channels, 128, args.layers, auxiliary=False)
     model.linear = nn.Sequential(nn.Linear(model.linear.in_features, model.linear.in_features), nn.ReLU(), model.linear)
