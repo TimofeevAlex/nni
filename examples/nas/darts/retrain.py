@@ -111,7 +111,6 @@ if __name__ == "__main__":
     else:
         model = CNN(32, 3, args.channels, 128, args.layers, auxiliary=False)
         model.linear = nn.Sequential(nn.Linear(model.linear.in_features, model.linear.in_features), nn.ReLU(), model.linear)
-        apply_fixed_architecture(model, args.arc_checkpoint)
    
     criterion = nn.CrossEntropyLoss()
 

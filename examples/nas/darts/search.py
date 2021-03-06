@@ -93,3 +93,4 @@ if __name__ == "__main__":
     ax.set_ylabel('Norm')
 #     ax.set_title('Architecture loss')
     plt.savefig('plots/search_arch_grad_'+ timenow + '.png')
+

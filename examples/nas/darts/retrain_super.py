@@ -9,6 +9,7 @@ from datetime import datetime
 
 from argparse import ArgumentParser
 import pandas as pd
+
 import torch
 import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
@@ -26,6 +27,7 @@ from fixed import apply_fixed_architecture
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt 
 import seaborn as sns
+
 logger = logging.getLogger('nni')
 
 
@@ -46,8 +48,7 @@ def train(config, train_loader, model, optimizer, criterion, epoch):
     losses_ = []
     grad_norm_w = []
     for step, (x, y) in enumerate(train_loader):
-        if step == 6:
-            break
+
         x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True)
         bs = x.size(0)
 
@@ -66,7 +67,7 @@ def train(config, train_loader, model, optimizer, criterion, epoch):
             total_norm += param_norm.item() ** 2
             total_norm = total_norm ** (1. / 2)
         grad_norm_w.append(total_norm)
-        
+
         accuracy = utils.accuracy(logits, y, topk=(1, 5))
         losses.update(loss.item(), bs)
         top1.update(accuracy["acc1"], bs)
@@ -76,8 +77,7 @@ def train(config, train_loader, model, optimizer, criterion, epoch):
         writer.add_scalar("acc5/train", accuracy["acc5"], global_step=cur_step)
 
         if step % config.log_frequency == 0 or step == len(train_loader) - 1:
-            print(
-                "Train: [{:3d}/{}] Step {:03d}/{:03d} Loss {losses.avg:.3f} "
+            print("Train: [{:3d}/{}] Step {:03d}/{:03d} Loss {losses.avg:.3f} "
                 "Prec@(1,5) ({top1.avg:.1%}, {top5.avg:.1%})".format(
                     epoch + 1, config.epochs, step, len(train_loader) - 1, losses=losses,
                     top1=top1, top5=top5))
@@ -86,6 +86,7 @@ def train(config, train_loader, model, optimizer, criterion, epoch):
 
     logger.info("Train: [{:3d}/{}] Final Prec@1 {:.4%}".format(epoch + 1, config.epochs, top1.avg))
     return np.mean(losses_), np.mean(grad_norm_w) 
+
 
 def validate(config, valid_loader, model, criterion, epoch, cur_step):
     top1 = AverageMeter("top1")
@@ -112,8 +113,7 @@ def validate(config, valid_loader, model, criterion, epoch, cur_step):
             top5.update(accuracy["acc5"], bs)
 
             if step % config.log_frequency == 0 or step == len(valid_loader) - 1:
-                print(
-                    "Valid: [{:3d}/{}] Step {:03d}/{:03d} Loss {losses.avg:.3f} "
+                print("Valid: [{:3d}/{}] Step {:03d}/{:03d} Loss {losses.avg:.3f} "
                     "Prec@(1,5) ({top1.avg:.1%}, {top5.avg:.1%})".format(
                         epoch + 1, config.epochs, step, len(valid_loader) - 1, losses=losses,
                         top1=top1, top5=top5))
@@ -147,13 +147,14 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", default=600, type=int)
     parser.add_argument("--workers", default=4)
     parser.add_argument("--pretrained", default="./checkpoints/epoch_0.json")
+
     parser.add_argument("--channels", default=36, type=int)
     parser.add_argument("--dataset", default='cifar5000')
     args = parser.parse_args()
     
 
     model = torch.load(args.pretrained)
-    
+
     model = nn.Sequential(model, nn.ReLU(), nn.Linear(128, 10))
     dataset_train, dataset_valid = datasets.get_dataset(args.dataset)# FIX TO 10%
     criterion = nn.CrossEntropyLoss()
@@ -223,3 +224,4 @@ if __name__ == "__main__":
     ax.set_ylabel('Loss')
 #     ax.set_title('Architecture loss')
     plt.savefig('plots/supervised_training_grad_norm_'+ timenow + '.png')
+
