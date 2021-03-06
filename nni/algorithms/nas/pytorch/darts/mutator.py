@@ -1,14 +1,15 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
-
+import sys
 import logging
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from nni.nas.pytorch.mutator import Mutator
-from nni.nas.pytorch.mutables import LayerChoice, InputChoice
+sys.path.append('../../../nni')
+from nas.pytorch.mutator import Mutator
+from nas.pytorch.mutables import LayerChoice, InputChoice
 
 _logger = logging.getLogger(__name__)
 

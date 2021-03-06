@@ -1,15 +1,16 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
-
+import sys
 import logging
 from collections import defaultdict
 
 import numpy as np
 import torch
 
-from .base_mutator import BaseMutator
-from .mutables import LayerChoice, InputChoice
-from .utils import to_list
+sys.path.append('../../../nni/')
+from nas.pytorch.base_mutator import BaseMutator
+from nas.pytorch.mutables import LayerChoice, InputChoice
+from nas.pytorch.utils_ import to_list
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +108,7 @@ class Mutator(BaseMutator):
         """
         if not torch.__version__.startswith("1.4"):
             logger.warning("Graph is only tested with PyTorch 1.4. Other versions might not work.")
-        from nni.common.graph_utils import build_graph
+        from common.graph_utils import build_graph
         from google.protobuf import json_format
         # protobuf should be installed as long as tensorboard is installed
         try:

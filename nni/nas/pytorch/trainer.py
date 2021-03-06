@@ -133,14 +133,22 @@ class Trainer(BaseTrainer):
         validate : bool
             If ``true``, will do validation every epoch.
         """
+        loss_arc = []
+        loss_w = []
+        grad_norm_arc = []
+        grad_norm_w = []
         for epoch in range(self.num_epochs):
             for callback in self.callbacks:
                 callback.on_epoch_begin(epoch)
 
             # training
             _logger.info("Epoch %d Training", epoch + 1)
-            self.train_one_epoch(epoch)
-
+            loss_arc_ep, loss_w_ep, grad_norm_w_ep, grad_norm_arc_ep  = self.train_one_epoch(epoch)
+            loss_arc.append(loss_arc_ep)
+            loss_w.append(loss_w_ep)
+            grad_norm_arc.append(grad_norm_arc_ep)
+            grad_norm_w.append(grad_norm_w_ep)
+            
             if validate:
                 # validation
                 _logger.info("Epoch %d Validating", epoch + 1)
@@ -148,6 +156,9 @@ class Trainer(BaseTrainer):
 
             for callback in self.callbacks:
                 callback.on_epoch_end(epoch)
+        
+        return loss_arc, loss_w, grad_norm_arc, grad_norm_w
+
 
     def validate(self):
         """
@@ -180,7 +191,7 @@ class Trainer(BaseTrainer):
         """
         sample = None
         for x, _ in self.train_loader:
-            sample = x.to(self.device)[:2]
+            sample = x[0].to(self.device)[:2]
             break
         if sample is None:
             _logger.warning("Sample is %s.", sample)

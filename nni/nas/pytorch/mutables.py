@@ -1,13 +1,14 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
-
+import sys
 import logging
 import warnings
 from collections import OrderedDict
 
 import torch.nn as nn
 
-from nni.nas.pytorch.utils import global_mutable_counting
+sys.path.append('../../../nni/')
+from nas.pytorch.utils_ import global_mutable_counting
 
 logger = logging.getLogger(__name__)
 

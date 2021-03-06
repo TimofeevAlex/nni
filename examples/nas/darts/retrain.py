@@ -1,11 +1,14 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
-
+import os
+import sys
 import logging
 import time
+from datetime import datetime 
 from argparse import ArgumentParser
 
 import torch
+import numpy as np
 import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F
@@ -14,8 +17,10 @@ import datasets
 import utils
 from utils import accuracy
 from model import CNN
-from nni.nas.pytorch.fixed import apply_fixed_architecture
-from nni.nas.pytorch.utils import AverageMeter
+sys.path.append('../../../nni/nas/pytorch/')
+from fixed import apply_fixed_architecture
+from utils_ import AverageMeter
+import matplotlib.pyplot as plt 
 
 logger = logging.getLogger('nni')
 
@@ -54,109 +59,38 @@ def info_nce_loss(features, config):
 
         logits = logits / config.temperature
         return logits, labels
-    
+
 def ssl_train(config, train_loader, model, optimizer, criterion, epoch):
     model.train()
     losses = AverageMeter("losses")
+    losses_ = []
+    grad_norm_w = []
     for step, (trn_X, _) in enumerate(train_loader):
+
         trn_X = torch.cat(trn_X, dim=0)
         trn_X = trn_X.to(device)
-
 
         optimizer.zero_grad()
         features = model(trn_X)
         logits, labels = info_nce_loss(features, config)
         loss = criterion(logits, labels)
-        loss.backward()
+        losses_.append(loss.item())
+        loss.backward()   
         nn.utils.clip_grad_norm_(model.parameters(), 5.)  # gradient clipping
         optimizer.step()
+        total_norm = 0
+        for p in model.parameters():
+            param_norm = p.grad.data.norm(2)
+            total_norm += param_norm.item() ** 2
+            total_norm = total_norm ** (1. / 2)
+        grad_norm_w.append(total_norm)
 
         losses.update(loss.item(), config.batch_size)
         if config.log_frequency is not None and step % config.log_frequency == 0:
-            logger.info("Train: [{:3d}/{}] Step {:03d}/{:03d} Loss {losses.avg:.3f} ".format(
-                        epoch + 1, config.epochs, step, len(train_loader) - 1, losses=losses))
+            print("Train: [{:3d}/{}] Step {:03d}/{:03d} Loss {losses.avg:.3f} ".format(
+                        epoch + 1, config.epochs, step, len(train_loader) - 1, losses=losses))    
 
-def train(config, train_loader, model, optimizer, criterion, epoch):
-    top1 = AverageMeter("top1")
-    top5 = AverageMeter("top5")
-    losses = AverageMeter("losses")
-
-    cur_step = epoch * len(train_loader)
-    cur_lr = optimizer.param_groups[0]["lr"]
-    logger.info("Epoch %d LR %.6f", epoch, cur_lr)
-    writer.add_scalar("lr", cur_lr, global_step=cur_step)
-
-    model.train()
-
-    for step, (x, y) in enumerate(train_loader):
-        x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True)
-        bs = x.size(0)
-
-        optimizer.zero_grad()
-        logits = model(x)
-        loss = criterion(logits, y)
-        if config.aux_weight > 0.:
-            loss += config.aux_weight * criterion(aux_logits, y)
-        loss.backward()
-        # gradient clipping
-        nn.utils.clip_grad_norm_(model.parameters(), config.grad_clip)
-        optimizer.step()
-
-        accuracy = utils.accuracy(logits, y, topk=(1, 5))
-        losses.update(loss.item(), bs)
-        top1.update(accuracy["acc1"], bs)
-        top5.update(accuracy["acc5"], bs)
-        writer.add_scalar("loss/train", loss.item(), global_step=cur_step)
-        writer.add_scalar("acc1/train", accuracy["acc1"], global_step=cur_step)
-        writer.add_scalar("acc5/train", accuracy["acc5"], global_step=cur_step)
-
-        if step % config.log_frequency == 0 or step == len(train_loader) - 1:
-            logger.info(
-                "Train: [{:3d}/{}] Step {:03d}/{:03d} Loss {losses.avg:.3f} "
-                "Prec@(1,5) ({top1.avg:.1%}, {top5.avg:.1%})".format(
-                    epoch + 1, config.epochs, step, len(train_loader) - 1, losses=losses,
-                    top1=top1, top5=top5))
-
-        cur_step += 1
-
-    logger.info("Train: [{:3d}/{}] Final Prec@1 {:.4%}".format(epoch + 1, config.epochs, top1.avg))
-
-
-def validate(config, valid_loader, model, criterion, epoch, cur_step):
-    top1 = AverageMeter("top1")
-    top5 = AverageMeter("top5")
-    losses = AverageMeter("losses")
-
-    model.eval()
-
-    with torch.no_grad():
-        for step, (X, y) in enumerate(valid_loader):
-            X, y = X.to(device, non_blocking=True), y.to(device, non_blocking=True)
-            bs = X.size(0)
-
-            logits = model(X)
-            loss = criterion(logits, y)
-
-            accuracy = utils.accuracy(logits, y, topk=(1, 5))
-            losses.update(loss.item(), bs)
-            top1.update(accuracy["acc1"], bs)
-            top5.update(accuracy["acc5"], bs)
-
-            if step % config.log_frequency == 0 or step == len(valid_loader) - 1:
-                logger.info(
-                    "Valid: [{:3d}/{}] Step {:03d}/{:03d} Loss {losses.avg:.3f} "
-                    "Prec@(1,5) ({top1.avg:.1%}, {top5.avg:.1%})".format(
-                        epoch + 1, config.epochs, step, len(valid_loader) - 1, losses=losses,
-                        top1=top1, top5=top5))
-
-    writer.add_scalar("loss/test", losses.avg, global_step=cur_step)
-    writer.add_scalar("acc1/test", top1.avg, global_step=cur_step)
-    writer.add_scalar("acc5/test", top5.avg, global_step=cur_step)
-
-    logger.info("Valid: [{:3d}/{}] Final Prec@1 {:.4%}".format(epoch + 1, config.epochs, top1.avg))
-
-    return top1.avg
-
+    return np.mean(losses_), np.mean(grad_norm_w)
 
 if __name__ == "__main__":
     parser = ArgumentParser("darts")
@@ -164,19 +98,20 @@ if __name__ == "__main__":
     parser.add_argument("--batch-size", default=96, type=int)
     parser.add_argument("--log-frequency", default=10, type=int)
     parser.add_argument("--epochs", default=600, type=int)
-    parser.add_argument("--aux-weight", default=0.4, type=float)
-    parser.add_argument("--drop-path-prob", default=0.2, type=float)
     parser.add_argument("--workers", default=4)
-    parser.add_argument("--grad-clip", default=5., type=float)
     parser.add_argument("--arc-checkpoint", default="./checkpoints/epoch_0.json")
     parser.add_argument("--temperature", default=0.07, type=float)
+    parser.add_argument("--channels", default=36, type=int)
+    parser.add_argument("--keep-training", default=None, type=str)
 
     args = parser.parse_args()
     
-
-    model = CNN(32, args.layers, 36, 128, args.layers, auxiliary=False)
-    model.linear = nn.Sequential(nn.Linear(model.linear.in_features, model.linear.in_features), nn.ReLU(), model.linear)
-    apply_fixed_architecture(model, args.arc_checkpoint)
+    if args.keep_training != None:
+        model = torch.load(args.keep_training)
+    else:
+        model = CNN(32, 3, args.channels, 128, args.layers, auxiliary=False)
+        model.linear = nn.Sequential(nn.Linear(model.linear.in_features, model.linear.in_features), nn.ReLU(), model.linear)
+        apply_fixed_architecture(model, args.arc_checkpoint)
    
     criterion = nn.CrossEntropyLoss()
 
@@ -192,55 +127,43 @@ if __name__ == "__main__":
                                                 batch_size=args.batch_size,
                                                 num_workers=args.workers,
                                                 drop_last=True)
+
+    try:  
+        os.mkdir('models')  
+    except OSError as error:  
+        print(error)   
+    timenow = str(datetime.now()).replace('-', '').replace(' ', '').replace(':', '').replace('.', '')
+    models_dir = os.path.join('models', timenow)
+    losses = []
+    grad_norm_w = []
+    os.mkdir(models_dir)
     for epoch in range(args.epochs):
-        ssl_train(args, train_loader, model, optimizer, criterion, epoch)
+        loss_ep, grad_norm_w_ep = ssl_train(args, train_loader, model, optimizer, criterion, epoch)
+        losses.append(loss_ep)
+        grad_norm_w.append(grad_norm_w_ep)
+        torch.save(model, os.path.join(models_dir, 'model'+'_'+str(epoch)))
+
+    torch.save(model, os.path.join(models_dir, 'model_final'))
     
-    # SUPERVISED
-    for param in model.parameters():
-        param.requires_grad = False
-    model = nn.Sequential(model, nn.ReLU(), nn.Linear(128, 10))
-    dataset_train, dataset_valid = datasets.get_dataset("cifar10")# FIX TO 10%
-    criterion = nn.CrossEntropyLoss()
-
-    model.to(device)
-    criterion.to(device)
-
-    optimizer = torch.optim.SGD(model.parameters(), 0.025, momentum=0.9, weight_decay=3.0E-4)
-    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.epochs, eta_min=1E-6)
-    if args.supervised:
-        train_loader = torch.utils.data.DataLoader(dataset_train,
-                                           batch_size=args.batch_size,
-                                           shuffle=True,
-                                           num_workers=args.workers,
-                                           pin_memory=True)
-    else:
-        n_train = len(dataset_train)
-        split = n_train #// 2
-        indices = list(range(n_train))
-        train_sampler = torch.utils.data.sampler.SubsetRandomSampler(indices[:split])
-        train_loader = torch.utils.data.DataLoader(dataset_train,
-                                                   batch_size=args.batch_size,
-                                                   sampler=train_sampler,
-                                                   num_workers=args.workers)
-    valid_loader = torch.utils.data.DataLoader(dataset_valid,
-                                               batch_size=args.batch_size,
-                                               shuffle=False,
-                                               num_workers=args.workers,
-                                               pin_memory=True)
-
-    best_top1 = 0.
-    for epoch in range(args.epochs):
-#         drop_prob = args.drop_path_prob * epoch / args.epochs
-#         model.drop_path_prob(drop_prob)
-
-        # training
-        train(args, train_loader, model, optimizer, criterion, epoch)
-
-        # validation
-        cur_step = (epoch + 1) * len(train_loader)
-        top1 = validate(args, valid_loader, model, criterion, epoch, cur_step)
-        best_top1 = max(best_top1, top1)
-
-        lr_scheduler.step()
-
-    logger.info("Final best Prec@1 = {:.4%}".format(best_top1))
+    try:  
+        os.mkdir('plots')  
+    except OSError as error:  
+        print(error)
+        
+    fig, ax = plt.subplots()
+    ax.plot(losses, label='Loss')
+    ax.grid(True)
+    ax.legend()
+    ax.set_xlabel('Epoch')
+    ax.set_ylabel('Loss')
+#     ax.set_title('Architecture loss')
+    plt.savefig('plots/ssl_training_loss_'+ timenow + '.png')
+    
+    fig, ax = plt.subplots()
+    ax.plot(grad_norm_w, label='Norm')
+    ax.grid(True)
+    ax.legend()
+    ax.set_xlabel('Norm')
+    ax.set_ylabel('Loss')
+#     ax.set_title('Architecture loss')
+    plt.savefig('plots/ssl_training_grad_norm_'+ timenow + '.png')

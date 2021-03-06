@@ -1,13 +1,14 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
-
+import sys
 from collections import OrderedDict
 
 import torch
 import torch.nn as nn
 
 import ops
-from nni.nas.pytorch import mutables
+sys.path.append('../../../nni')
+from nas.pytorch import mutables
 
 
 class AuxiliaryHead(nn.Module):

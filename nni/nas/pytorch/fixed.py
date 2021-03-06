@@ -1,12 +1,13 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
-
+import sys
 import json
 import logging
 
-from .mutables import InputChoice, LayerChoice, MutableScope
-from .mutator import Mutator
-from .utils import to_list
+sys.path.append('../../../nni/')
+from nas.pytorch.mutables import InputChoice, LayerChoice, MutableScope
+from nas.pytorch.mutator import Mutator
+from nas.pytorch.utils_ import to_list
 
 
 _logger = logging.getLogger(__name__)

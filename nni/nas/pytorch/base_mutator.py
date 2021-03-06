@@ -1,11 +1,12 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
-
+import sys
 import logging
 
 import torch.nn as nn
-from nni.nas.pytorch.mutables import Mutable, MutableScope, InputChoice
-from nni.nas.pytorch.utils import StructuredMutableTreeNode
+sys.path.append('../../../nni/')
+from nas.pytorch.mutables import Mutable, MutableScope, InputChoice
+from nas.pytorch.utils_ import StructuredMutableTreeNode
 
 logger = logging.getLogger(__name__)
 

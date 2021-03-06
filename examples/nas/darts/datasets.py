@@ -8,7 +8,39 @@ from torchvision.datasets import CIFAR10, STL10
 from torchvision.transforms import transforms
 from gaussian_blur import GaussianBlur
 from view_generator import ContrastiveLearningViewGenerator
+from collections import defaultdict, deque
+import itertools
 
+
+class CIFAR5000(CIFAR10):
+    def __init__(self, path, transforms, train=True):
+        super().__init__(path, train, download=True)
+        self.transforms = transforms
+        self.n_images_per_class = 1000
+        self.n_classes = 10
+        self.new2old_indices = self.create_idx_mapping()
+
+    def create_idx_mapping(self):
+        label2idx = defaultdict(lambda: deque(maxlen=self.n_images_per_class))
+        for original_idx in range(super().__len__()):
+            _, label = super().__getitem__(original_idx)
+            label2idx[label].append(original_idx)
+
+        old_idxs = set(itertools.chain(*label2idx.values()))
+        new2old_indices = {}
+        for new_idx, old_idx in enumerate(old_idxs):
+            new2old_indices[new_idx] = old_idx
+
+        return new2old_indices
+
+    def __len__(self):
+        return len(self.new2old_indices)
+
+    def __getitem__(self, index):
+        index = self.new2old_indices[index]
+        im, label = super().__getitem__(index)
+        return self.transforms(im), label
+    
 class Cutout(object):
     def __init__(self, length):
         self.length = length
@@ -52,9 +84,14 @@ def get_dataset(cls, cutout_length=0):
 
     if cls == "cifar10":
         dataset_train = CIFAR10(root="./data", train=True, download=True, transform=train_transform)
-        dataset_valid = CIFAR10(root="./data", train=False, download=True, transform=valid_transform)
-    else:
-        raise NotImplementedError
+    if cls == "cifar5000":
+        dataset_train = CIFAR10(root="./data", train=True, download=True, transform=train_transform)
+        dataset_train = torch.utils.data.Subset(dataset_train, np.arange(10000))
+    if cls == "nucifar10":
+        indices = np.load('indices_nucifar10.npy')
+        dataset_train = CIFAR10(root="./data", train=True, download=True, transform=train_transform)
+        dataset_train = torch.utils.data.Subset(dataset_train, indices)
+    dataset_valid = CIFAR10(root="./data", train=False, download=True, transform=valid_transform)
     return dataset_train, dataset_valid
 
 class ContrastiveLearningDataset:
