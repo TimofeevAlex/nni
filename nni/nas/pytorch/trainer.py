@@ -174,7 +174,7 @@ class Trainer(BaseTrainer):
                 ax.set_xlabel('Epoch')
                 ax.set_ylabel('Loss')
             #     ax.set_title('Architecture loss')
-                plt.savefig('plots/search_arch_loss_epoch_'+ epoch + '_' + timenow + '.png')
+                plt.savefig('plots/search_arch_loss_epoch_'+ str(epoch) + '_' + timenow + '.png')
 
                 fig, ax = plt.subplots()
                 ax.plot(grad_norm_arc, label='Architecture grad norm')
@@ -184,7 +184,7 @@ class Trainer(BaseTrainer):
                 ax.set_xlabel('Epoch')
                 ax.set_ylabel('Norm')
             #     ax.set_title('Architecture loss')
-                plt.savefig('plots/search_arch_grad_epoch_'+ epoch + '_' + timenow + '.png')
+                plt.savefig('plots/search_arch_grad_epoch_'+ str(epoch) + '_' + timenow + '.png')
 
         
         return loss_arc, loss_w, grad_norm_arc, grad_norm_w

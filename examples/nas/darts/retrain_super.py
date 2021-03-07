@@ -211,7 +211,7 @@ if __name__ == "__main__":
             ax.set_xlabel('Epoch')
             ax.set_ylabel('Loss')
         #     ax.set_title('Architecture loss')
-            plt.savefig('plots/supervised_training_loss_epoch_'+ epoch + '_' + timenow + '.png')
+            plt.savefig('plots/supervised_training_loss_epoch_'+ str(epoch) + '_' + timenow + '.png')
 
             fig, ax = plt.subplots()
             ax.plot(grad_norm_w, label='Norm')
@@ -220,7 +220,7 @@ if __name__ == "__main__":
             ax.set_xlabel('Norm')
             ax.set_ylabel('Loss')
         #     ax.set_title('Architecture loss')
-            plt.savefig('plots/supervised_training_grad_norm_epoch_'+ epoch + '_' + timenow + '.png')
+            plt.savefig('plots/supervised_training_grad_norm_epoch_'+ str(epoch) + '_' + timenow + '.png')
 
     print("Final best Prec@1 = {:.4%}".format(best_top1))
     torch.save(model, os.path.join(models_dir, 'model_final'))
