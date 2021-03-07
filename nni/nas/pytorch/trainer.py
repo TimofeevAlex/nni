@@ -7,7 +7,7 @@ import os
 import time
 from abc import abstractmethod
 from datetime import datetime 
-
+import matplotlib.pyplot as plt
 import torch
 
 from .base_trainer import BaseTrainer
