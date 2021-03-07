@@ -82,7 +82,7 @@ if __name__ == "__main__":
     ax.set_xlabel('Epoch')
     ax.set_ylabel('Loss')
 #     ax.set_title('Architecture loss')
-    plt.savefig('plots/search_arch_loss_'+ timenow + '.png')
+    plt.savefig('plots/search_arch_loss_final'+ timenow + '.png')
     
     fig, ax = plt.subplots()
     ax.plot(grad_norm_arc, label='Architecture grad norm')
@@ -92,5 +92,5 @@ if __name__ == "__main__":
     ax.set_xlabel('Epoch')
     ax.set_ylabel('Norm')
 #     ax.set_title('Architecture loss')
-    plt.savefig('plots/search_arch_grad_'+ timenow + '.png')
+    plt.savefig('plots/search_arch_grad_final'+ timenow + '.png')
 

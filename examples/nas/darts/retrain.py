@@ -130,7 +130,13 @@ if __name__ == "__main__":
     try:  
         os.mkdir('models')  
     except OSError as error:  
-        print(error)   
+        print(error) 
+        
+    try:  
+        os.mkdir('plots')  
+    except OSError as error:  
+        print(error)
+        
     timenow = str(datetime.now()).replace('-', '').replace(' ', '').replace(':', '').replace('.', '')
     models_dir = os.path.join('models', timenow)
     losses = []
@@ -141,13 +147,30 @@ if __name__ == "__main__":
         losses.append(loss_ep)
         grad_norm_w.append(grad_norm_w_ep)
         torch.save(model, os.path.join(models_dir, 'model'+'_'+str(epoch)))
+        
+        if epoch % 5 == 0:
+        
+            fig, ax = plt.subplots()
+            ax.plot(losses, label='Loss')
+            ax.grid(True)
+            ax.legend()
+            ax.set_xlabel('Epoch')
+            ax.set_ylabel('Loss')
+        #     ax.set_title('Architecture loss')
+            plt.savefig('plots/ssl_training_loss_epoch_'+ epoch + '_' + timenow + '.png')
+
+            fig, ax = plt.subplots()
+            ax.plot(grad_norm_w, label='Norm')
+            ax.grid(True)
+            ax.legend()
+            ax.set_xlabel('Norm')
+            ax.set_ylabel('Loss')
+        #     ax.set_title('Architecture loss')
+            plt.savefig('plots/ssl_training_grad_norm_epoch_'+ epoch + '_' timenow + '.png')
 
     torch.save(model, os.path.join(models_dir, 'model_final'))
     
-    try:  
-        os.mkdir('plots')  
-    except OSError as error:  
-        print(error)
+
         
     fig, ax = plt.subplots()
     ax.plot(losses, label='Loss')
@@ -156,7 +179,7 @@ if __name__ == "__main__":
     ax.set_xlabel('Epoch')
     ax.set_ylabel('Loss')
 #     ax.set_title('Architecture loss')
-    plt.savefig('plots/ssl_training_loss_'+ timenow + '.png')
+    plt.savefig('plots/ssl_training_loss_final_'+ timenow + '.png')
     
     fig, ax = plt.subplots()
     ax.plot(grad_norm_w, label='Norm')
@@ -165,4 +188,4 @@ if __name__ == "__main__":
     ax.set_xlabel('Norm')
     ax.set_ylabel('Loss')
 #     ax.set_title('Architecture loss')
-    plt.savefig('plots/ssl_training_grad_norm_'+ timenow + '.png')
+    plt.savefig('plots/ssl_training_grad_norm_final_'+ timenow + '.png')

@@ -179,7 +179,12 @@ if __name__ == "__main__":
     try:  
         os.mkdir('models_super')  
     except OSError as error:  
-        print(error)   
+        print(error)     
+    try:  
+        os.mkdir('plots')  
+    except OSError as error:  
+        print(error)
+        
     timenow = str(datetime.now()).replace('-', '').replace(' ', '').replace(':', '').replace('.', '')
     models_dir = os.path.join('models', timenow)
     os.mkdir(models_dir)
@@ -198,14 +203,29 @@ if __name__ == "__main__":
         lr_scheduler.step()
         torch.save(model, os.path.join(models_dir, 'model'+'_'+str(epoch)))
         
+        if epoch % 5 == 0:
+            fig, ax = plt.subplots()
+            ax.plot(losses, label='Loss')
+            ax.grid(True)
+            ax.legend()
+            ax.set_xlabel('Epoch')
+            ax.set_ylabel('Loss')
+        #     ax.set_title('Architecture loss')
+            plt.savefig('plots/supervised_training_loss_epoch_'+ epoch + '_' + timenow + '.png')
 
-    logger.info("Final best Prec@1 = {:.4%}".format(best_top1))
+            fig, ax = plt.subplots()
+            ax.plot(grad_norm_w, label='Norm')
+            ax.grid(True)
+            ax.legend()
+            ax.set_xlabel('Norm')
+            ax.set_ylabel('Loss')
+        #     ax.set_title('Architecture loss')
+            plt.savefig('plots/supervised_training_grad_norm_epoch_'+ epoch + '_' + timenow + '.png')
+
+    print("Final best Prec@1 = {:.4%}".format(best_top1))
     torch.save(model, os.path.join(models_dir, 'model_final'))
     
-    try:  
-        os.mkdir('plots')  
-    except OSError as error:  
-        print(error)
+
         
     fig, ax = plt.subplots()
     ax.plot(losses, label='Loss')
@@ -214,7 +234,7 @@ if __name__ == "__main__":
     ax.set_xlabel('Epoch')
     ax.set_ylabel('Loss')
 #     ax.set_title('Architecture loss')
-    plt.savefig('plots/supervised_training_loss_'+ timenow + '.png')
+    plt.savefig('plots/supervised_training_loss_final'+ timenow + '.png')
     
     fig, ax = plt.subplots()
     ax.plot(grad_norm_w, label='Norm')
@@ -223,5 +243,5 @@ if __name__ == "__main__":
     ax.set_xlabel('Norm')
     ax.set_ylabel('Loss')
 #     ax.set_title('Architecture loss')
-    plt.savefig('plots/supervised_training_grad_norm_'+ timenow + '.png')
+    plt.savefig('plots/supervised_training_grad_norm_final'+ timenow + '.png')
 

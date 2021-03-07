@@ -137,6 +137,11 @@ class Trainer(BaseTrainer):
         loss_w = []
         grad_norm_arc = []
         grad_norm_w = []
+        try:  
+            os.mkdir('plots')  
+        except OSError as error:  
+            print(error)
+        
         for epoch in range(self.num_epochs):
             for callback in self.callbacks:
                 callback.on_epoch_begin(epoch)
@@ -156,6 +161,30 @@ class Trainer(BaseTrainer):
 
             for callback in self.callbacks:
                 callback.on_epoch_end(epoch)
+        
+            if epoch % 5 == 0:
+                timenow = str(datetime.now()).replace('-', '').replace(' ', '').replace(':', '').replace('.', '')
+
+                fig, ax = plt.subplots()
+                ax.plot(loss_arc, label='Architecture loss')
+                ax.plot(loss_w, label='Weights loss')
+                ax.grid(True)
+                ax.legend()
+                ax.set_xlabel('Epoch')
+                ax.set_ylabel('Loss')
+            #     ax.set_title('Architecture loss')
+                plt.savefig('plots/search_arch_loss_epoch_'+ epoch + '_' + timenow + '.png')
+
+                fig, ax = plt.subplots()
+                ax.plot(grad_norm_arc, label='Architecture grad norm')
+                ax.plot(grad_norm_w, label='Weights grad norm')
+                ax.grid(True)
+                ax.legend()
+                ax.set_xlabel('Epoch')
+                ax.set_ylabel('Norm')
+            #     ax.set_title('Architecture loss')
+                plt.savefig('plots/search_arch_grad_epoch_'+ epoch + '_' + timenow + '.png')
+
         
         return loss_arc, loss_w, grad_norm_arc, grad_norm_w
 
