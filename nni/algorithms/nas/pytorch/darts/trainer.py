@@ -150,7 +150,7 @@ class SSLDartsTrainer(Trainer):
                 if step == 0:
                     Xs = features[:self.batch_size]
                     ys = y
-                Xs = torch.cat([Xs, X])
+                Xs = torch.cat([Xs, features[:self.batch_size]])
                 ys = torch.cat([ys, y])
                 if self.log_frequency is not None and step % self.log_frequency == 0:
                     print("Epoch [{}/{}] Step [{}/{}]  {}".format(epoch + 1,

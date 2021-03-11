@@ -104,9 +104,9 @@ def ssl_train(config, train_loader, model, optimizer, criterion, epoch):
                 loss = criterion(logits, labels)
                 losses.append(loss.item())
                 if step == 0:
-                    Xs = features[:self.batch_size]
+                    Xs = features[:config.batch_size]
                     ys = y
-                Xs = torch.cat([Xs, X])
+                Xs = torch.cat([Xs, features[:config.batch_size]])
                 ys = torch.cat([ys, y])
                 if config.log_frequency is not None and step % config.log_frequency == 0:
                     print("Epoch [{}/{}] Step [{}/{}]  {}".format(epoch + 1,
