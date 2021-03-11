@@ -117,7 +117,7 @@ class SSLDartsTrainer(Trainer):
             logits, labels, loss = self._logits_and_loss(trn_X)
             loss_w.append(loss.item())
             loss.backward()
-            nn.utils.clip_grad_norm_(self.model.parameters(), 5.)  # gradient clipping
+#             nn.utils.clip_grad_norm_(self.model.parameters(), 5.)  # gradient clipping
             self.optimizer.step()
             total_norm = 0
             for p in self.model.parameters():
@@ -137,18 +137,25 @@ class SSLDartsTrainer(Trainer):
     def validate_one_epoch(self, epoch):
         self.model.eval()
         self.mutator.eval()
-        meters = AverageMeterGroup()
+        losses = []
         with torch.no_grad():
             self.mutator.reset()
-            for step, (X, _) in enumerate(self.test_loader):
+            for step, (X, y) in enumerate(self.test_loader):
+                X = torch.cat(X, dim=0)
                 X = X.to(self.device)
                 features = self.model(X)
                 logits, labels = self.info_nce_loss(features)
-                metrics = self.metrics(logits, labels)
-                meters.update(metrics)
+                loss = self.loss(logits, labels)
+                losses.append(loss.item())
+                if step == 0:
+                    Xs = features[:self.batch_size]
+                    ys = y
+                Xs = torch.cat([Xs, X])
+                ys = torch.cat([ys, y])
                 if self.log_frequency is not None and step % self.log_frequency == 0:
-                    print("Epoch [{}/{}] Step [{}/{}]  {}", epoch + 1,
-                                self.num_epochs, step + 1, len(self.test_loader), meters)
+                    print("Epoch [{}/{}] Step [{}/{}]  {}".format(epoch + 1,
+                                self.num_epochs, step + 1, len(self.test_loader), loss))
+        return np.mean(losses), Xs.detach().numpy(), ys.detach().numpy()
 
     def info_nce_loss(self, features):
         labels = torch.cat([torch.arange(self.batch_size) for i in range(2)], dim=0)

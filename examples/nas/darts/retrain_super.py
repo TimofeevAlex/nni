@@ -96,6 +96,7 @@ def validate(config, valid_loader, model, criterion, epoch, cur_step):
     model.eval()
     y_true = np.array([])
     y_pred = np.array([])
+    losses_val = []
     with torch.no_grad():
         for step, (X, y) in enumerate(valid_loader):
             y_true = np.append(y_true, np.array(y))
@@ -106,7 +107,7 @@ def validate(config, valid_loader, model, criterion, epoch, cur_step):
             y_pred = np.append(y_pred, np.argmax(logits.cpu().numpy(), axis=1))
         
             loss = criterion(logits, y)
-
+            losses_val.append(loss.item())
             accuracy = utils.accuracy(logits, y, topk=(1, 5))
             losses.update(loss.item(), bs)
             top1.update(accuracy["acc1"], bs)
@@ -135,8 +136,8 @@ def validate(config, valid_loader, model, criterion, epoch, cur_step):
     ax.set_xticklabels(ax.get_xticklabels(), rotation=45, horizontalalignment='right')
     ax.set_yticklabels(ax.get_yticklabels(), rotation=45, horizontalalignment='right')
     ax.set_title('Confusion matrix heatmap')
-    plt.savefig('confusion_matrix.png')
-    return top1.avg
+    plt.savefig('plots/confusion_matrix'+config.dataset+'.png')
+    return top1.avg, np.mean(losses_val)
 
 
 if __name__ == "__main__":
@@ -186,9 +187,10 @@ if __name__ == "__main__":
         print(error)
         
     timenow = str(datetime.now()).replace('-', '').replace(' ', '').replace(':', '').replace('.', '')
-    models_dir = os.path.join('models', timenow)
+    models_dir = os.path.join('models_super', timenow)
     os.mkdir(models_dir)
     losses = []
+    losses_val = []
     grad_norm_w = []
     for epoch in range(args.epochs):
         # training
@@ -197,51 +199,29 @@ if __name__ == "__main__":
         grad_norm_w.append(grad_norm_w_ep)
         # validation
         cur_step = (epoch + 1) * len(train_loader)
-        top1 = validate(args, valid_loader, model, criterion, epoch, cur_step)
+        top1, loss_val_ep = validate(args, valid_loader, model, criterion, epoch, cur_step)
+        losses_val.append(loss_val_ep)
         best_top1 = max(best_top1, top1)
 
         lr_scheduler.step()
-        torch.save(model, os.path.join(models_dir, 'model'+'_'+str(epoch)))
+        torch.save(model, os.path.join(models_dir, 'model'+'_'+str(epoch)+'_'+config.dataset+'.pt'))
         
         if epoch % 5 == 0:
             fig, ax = plt.subplots()
-            ax.plot(losses, label='Loss')
+            ax.plot(losses, label='Train loss')
+            ax.plot(losses_val, label='Validation loss')
             ax.grid(True)
             ax.legend()
             ax.set_xlabel('Epoch')
             ax.set_ylabel('Loss')
-        #     ax.set_title('Architecture loss')
-            plt.savefig('plots/supervised_training_loss_epoch_'+ str(epoch) + '_' + timenow + '.png')
+            plt.savefig('plots/supervised_training_loss_epoch_'+ str(epoch) + '_' + config.dataset + '_'+ timenow + '.png')
 
             fig, ax = plt.subplots()
             ax.plot(grad_norm_w, label='Norm')
             ax.grid(True)
             ax.legend()
-            ax.set_xlabel('Norm')
-            ax.set_ylabel('Loss')
-        #     ax.set_title('Architecture loss')
-            plt.savefig('plots/supervised_training_grad_norm_epoch_'+ str(epoch) + '_' + timenow + '.png')
+            ax.set_xlabel('Epoch')
+            ax.set_ylabel('Norm')
+            plt.savefig('plots/supervised_training_grad_norm_epoch_'+ str(epoch) + '_' + config.dataset + '_'+timenow + '.png')
 
     print("Final best Prec@1 = {:.4%}".format(best_top1))
-    torch.save(model, os.path.join(models_dir, 'model_final'))
-    
-
-        
-    fig, ax = plt.subplots()
-    ax.plot(losses, label='Loss')
-    ax.grid(True)
-    ax.legend()
-    ax.set_xlabel('Epoch')
-    ax.set_ylabel('Loss')
-#     ax.set_title('Architecture loss')
-    plt.savefig('plots/supervised_training_loss_final'+ timenow + '.png')
-    
-    fig, ax = plt.subplots()
-    ax.plot(grad_norm_w, label='Norm')
-    ax.grid(True)
-    ax.legend()
-    ax.set_xlabel('Norm')
-    ax.set_ylabel('Loss')
-#     ax.set_title('Architecture loss')
-    plt.savefig('plots/supervised_training_grad_norm_final'+ timenow + '.png')
-

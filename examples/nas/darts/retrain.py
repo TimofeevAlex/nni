@@ -76,7 +76,7 @@ def ssl_train(config, train_loader, model, optimizer, criterion, epoch):
         loss = criterion(logits, labels)
         losses_.append(loss.item())
         loss.backward()   
-        nn.utils.clip_grad_norm_(model.parameters(), 5.)  # gradient clipping
+#         nn.utils.clip_grad_norm_(model.parameters(), 5.)  # gradient clipping
         optimizer.step()
         total_norm = 0
         for p in model.parameters():
@@ -92,6 +92,27 @@ def ssl_train(config, train_loader, model, optimizer, criterion, epoch):
 
     return np.mean(losses_), np.mean(grad_norm_w)
 
+    def validate_one_epoch(config, model, test_loader, criterion, epoch):
+        losses = []
+        with torch.no_grad():
+            self.mutator.reset()
+            for step, (X, _) in enumerate(test_loader):
+                X = torch.cat(X, dim=0)
+                X = X.to(device)
+                features = model(X)
+                logits, labels = info_nce_loss(features)
+                loss = criterion(logits, labels)
+                losses.append(loss.item())
+                if step == 0:
+                    Xs = features[:self.batch_size]
+                    ys = y
+                Xs = torch.cat([Xs, X])
+                ys = torch.cat([ys, y])
+                if config.log_frequency is not None and step % config.log_frequency == 0:
+                    print("Epoch [{}/{}] Step [{}/{}]  {}".format(epoch + 1,
+                                config.epochs, step + 1, len(test_loader), loss))
+        return np.mean(losses), Xs.detach().numpy(), ys.detach().numpy()
+        
 if __name__ == "__main__":
     parser = ArgumentParser("darts")
     parser.add_argument("--layers", default=20, type=int)
@@ -110,6 +131,7 @@ if __name__ == "__main__":
         model = torch.load(args.keep_training)
     else:
         model = CNN(32, 3, args.channels, 128, args.layers, auxiliary=False)
+        apply_fixed_architecture(model, args.arc_checkpoint)
         model.linear = nn.Sequential(nn.Linear(model.linear.in_features, model.linear.in_features), nn.ReLU(), model.linear)
    
     criterion = nn.CrossEntropyLoss()
@@ -121,11 +143,15 @@ if __name__ == "__main__":
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.epochs, eta_min=1E-6)
     
     dataset = datasets.ContrastiveLearningDataset('./data')
-    dataset_train, _ = dataset.get_dataset()
+    dataset_train, dataset_valid = dataset.get_dataset()
     train_loader = torch.utils.data.DataLoader(dataset_train,
                                                 batch_size=args.batch_size,
                                                 num_workers=args.workers,
                                                 drop_last=True)
+    test_loader = torch.utils.data.DataLoader(dataset_valid,
+                                               batch_size=args.batch_size,
+                                               num_workers=args.workers,
+                                               drop_last=True)
 
     try:  
         os.mkdir('models')  
@@ -135,57 +161,49 @@ if __name__ == "__main__":
     try:  
         os.mkdir('plots')  
     except OSError as error:  
-        print(error)
+        print(error) 
         
     timenow = str(datetime.now()).replace('-', '').replace(' ', '').replace(':', '').replace('.', '')
     models_dir = os.path.join('models', timenow)
     losses = []
+    losses_val = []
     grad_norm_w = []
     os.mkdir(models_dir)
     for epoch in range(args.epochs):
         loss_ep, grad_norm_w_ep = ssl_train(args, train_loader, model, optimizer, criterion, epoch)
         losses.append(loss_ep)
         grad_norm_w.append(grad_norm_w_ep)
-        torch.save(model, os.path.join(models_dir, 'model'+'_'+str(epoch)))
+        torch.save(model, os.path.join(models_dir, 'model'+'_'+str(epoch)+'.pt'))
         
         if epoch % 5 == 0:
-        
+            loss_val_ep, Xs, ys = validate_one_epoch(args, model, test_loader, criterion, epoch)
+            losses_val.append(loss_val_ep)
+            
+            # T-SNE
+            class_labels= ['airplanes', 'cars', 'birds', 'cats', 'deer',\
+                           'dogs', 'frogs', 'horses', 'ships', 'trucks']
+            Xs_proj = TSNE(n_components=2).fit_transform(Xs)
+            fig, ax = plt.subplots()
+            for color in np.unique(ys.detach().numpy()):
+                ax.scatter(Xs_proj[ys==color, 0], Xs_proj[ys==color, 1], label=class_labels[color-1])
+            ax.legend()
+            plt.savefig('plots/tsne_arch_search_'+ str(epoch) + '_' + timenow + '.png')  
+            
+            # Loss and gradient plots
             fig, ax = plt.subplots()
             ax.plot(losses, label='Loss')
+            x = np.arange(0, 5 * len(losses_val), 5)
+            ax.plot(x, losses_val, label='Validation loss')
             ax.grid(True)
             ax.legend()
             ax.set_xlabel('Epoch')
             ax.set_ylabel('Loss')
-        #     ax.set_title('Architecture loss')
             plt.savefig('plots/ssl_training_loss_epoch_'+ str(epoch) + '_' + timenow + '.png')
 
             fig, ax = plt.subplots()
             ax.plot(grad_norm_w, label='Norm')
             ax.grid(True)
             ax.legend()
-            ax.set_xlabel('Norm')
-            ax.set_ylabel('Loss')
-        #     ax.set_title('Architecture loss')
+            ax.set_xlabel('Epoch')
+            ax.set_ylabel('Norm')
             plt.savefig('plots/ssl_training_grad_norm_epoch_'+ str(epoch) + '_' timenow + '.png')
-
-    torch.save(model, os.path.join(models_dir, 'model_final'))
-    
-
-        
-    fig, ax = plt.subplots()
-    ax.plot(losses, label='Loss')
-    ax.grid(True)
-    ax.legend()
-    ax.set_xlabel('Epoch')
-    ax.set_ylabel('Loss')
-#     ax.set_title('Architecture loss')
-    plt.savefig('plots/ssl_training_loss_final_'+ timenow + '.png')
-    
-    fig, ax = plt.subplots()
-    ax.plot(grad_norm_w, label='Norm')
-    ax.grid(True)
-    ax.legend()
-    ax.set_xlabel('Norm')
-    ax.set_ylabel('Loss')
-#     ax.set_title('Architecture loss')
-    plt.savefig('plots/ssl_training_grad_norm_final_'+ timenow + '.png')

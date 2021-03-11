@@ -1,6 +1,6 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
-
+# import sys
 import json
 import logging
 import os
@@ -9,6 +9,9 @@ from abc import abstractmethod
 from datetime import datetime 
 import matplotlib.pyplot as plt
 import torch
+from torchviz import make_dot
+# sys.path.append('../../../nni/nas/pytorch/')
+from fixed import apply_fixed_architecture
 
 from .base_trainer import BaseTrainer
 
@@ -124,7 +127,7 @@ class Trainer(BaseTrainer):
         """
         pass
 
-    def train(self, validate=True):
+    def train(self, args, validate=True):
         """
         Train ``num_epochs``.
         Trigger callbacks at the start and the end of each epoch.
@@ -138,6 +141,7 @@ class Trainer(BaseTrainer):
         loss_w = []
         grad_norm_arc = []
         grad_norm_w = []
+        loss_val = []
         try:  
             os.mkdir('plots')  
         except OSError as error:  
@@ -148,32 +152,51 @@ class Trainer(BaseTrainer):
                 callback.on_epoch_begin(epoch)
 
             # training
-            _logger.info("Epoch %d Training", epoch + 1)
+            print("Epoch %d Training", epoch + 1)
             loss_arc_ep, loss_w_ep, grad_norm_w_ep, grad_norm_arc_ep  = self.train_one_epoch(epoch)
             loss_arc.append(loss_arc_ep)
             loss_w.append(loss_w_ep)
             grad_norm_arc.append(grad_norm_arc_ep)
             grad_norm_w.append(grad_norm_w_ep)
             
-            if validate:
+            if validate and (epoch % 5) == 0:
                 # validation
-                _logger.info("Epoch %d Validating", epoch + 1)
-                self.validate_one_epoch(epoch)
+                print("Epoch %d Validating", epoch + 1)
+                loss_val_ep, Xs, ys = self.validate_one_epoch(epoch)
+                loss_val.append(loss_val_ep)
 
             for callback in self.callbacks:
                 callback.on_epoch_end(epoch)
         
             if epoch % 5 == 0:
+                # Arch visualization
+                model_tmp = CNN(32, 3, args.channels, 128, args.layers)
+                apply_fixed_architecture(model_tmp, 'checkpoints/epoch_'+str(epoch)+'.json')
+                viz = make_dot(model_tmp(torch.rand((1, 3, 32, 32))), params=dict(list(model_tmp.named_parameters())))
+                viz.render("arch_vis/cnn_torchviz_" + str(epoch), format="png")
+                
+                # T-SNE
+                class_labels= ['airplanes', 'cars', 'birds', 'cats', 'deer',\
+                               'dogs', 'frogs', 'horses', 'ships', 'trucks']
+                Xs_proj = TSNE(n_components=2).fit_transform(Xs)
+                fig, ax = plt.subplots()
+                for color in np.unique(ys.detach().numpy()):
+                    ax.scatter(Xs_proj[ys==color, 0], Xs_proj[ys==color, 1], label=class_labels[color-1])
+                ax.legend()
+                plt.savefig('plots/tsne_arch_search_'+ str(epoch) + '_' + timenow + '.png')
+                
+                # Loss and gradient plots
                 timenow = str(datetime.now()).replace('-', '').replace(' ', '').replace(':', '').replace('.', '')
-
+                
                 fig, ax = plt.subplots()
                 ax.plot(loss_arc, label='Architecture loss')
                 ax.plot(loss_w, label='Weights loss')
+                x = np.arange(0, 5 * len(loss_val), 5)
+                ax.plot(x, loss_val, label='Validation loss')
                 ax.grid(True)
                 ax.legend()
                 ax.set_xlabel('Epoch')
                 ax.set_ylabel('Loss')
-            #     ax.set_title('Architecture loss')
                 plt.savefig('plots/search_arch_loss_epoch_'+ str(epoch) + '_' + timenow + '.png')
 
                 fig, ax = plt.subplots()
@@ -183,11 +206,9 @@ class Trainer(BaseTrainer):
                 ax.legend()
                 ax.set_xlabel('Epoch')
                 ax.set_ylabel('Norm')
-            #     ax.set_title('Architecture loss')
                 plt.savefig('plots/search_arch_grad_epoch_'+ str(epoch) + '_' + timenow + '.png')
 
-        
-        return loss_arc, loss_w, grad_norm_arc, grad_norm_w
+        return loss_arc, loss_w, loss_val, grad_norm_arc, grad_norm_w
 
 
     def validate(self):
