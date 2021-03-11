@@ -111,7 +111,7 @@ def ssl_train(config, train_loader, model, optimizer, criterion, epoch):
                 if config.log_frequency is not None and step % config.log_frequency == 0:
                     print("Epoch [{}/{}] Step [{}/{}]  {}".format(epoch + 1,
                                 config.epochs, step + 1, len(test_loader), loss))
-        return np.mean(losses), Xs.detach().numpy(), ys.detach().numpy()
+        return np.mean(losses), Xs.detach().cpu().numpy(), ys.detach().cpu().numpy()
         
 if __name__ == "__main__":
     parser = ArgumentParser("darts")

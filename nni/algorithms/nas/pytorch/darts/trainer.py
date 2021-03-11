@@ -155,7 +155,7 @@ class SSLDartsTrainer(Trainer):
                 if self.log_frequency is not None and step % self.log_frequency == 0:
                     print("Epoch [{}/{}] Step [{}/{}]  {}".format(epoch + 1,
                                 self.num_epochs, step + 1, len(self.test_loader), loss))
-        return np.mean(losses), Xs.detach().numpy(), ys.detach().numpy()
+        return np.mean(losses), Xs.detach().cpu().numpy(), ys.detach().cpu().numpy()
 
     def info_nce_loss(self, features):
         labels = torch.cat([torch.arange(self.batch_size) for i in range(2)], dim=0)
