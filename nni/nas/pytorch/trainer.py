@@ -1,6 +1,6 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
-# import sys
+import sys
 import json
 import logging
 import os
@@ -10,8 +10,8 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import torch
 from torchviz import make_dot
-# sys.path.append('../../../nni/nas/pytorch/')
-from fixed import apply_fixed_architecture
+sys.path.append('../../../nni/')
+from nas.pytorch.fixed import apply_fixed_architecture
 
 from .base_trainer import BaseTrainer
 
