@@ -173,6 +173,8 @@ class Trainer(BaseTrainer):
                 callback.on_epoch_end(epoch)
         
             if epoch % 5 == 0:
+                timenow = str(datetime.now()).replace('-', '').replace(' ', '').replace(':', '').replace('.', '')
+                
                 # Arch visualization
                 model_tmp = CNN(32, 3, args.channels, 128, args.layers)
                 apply_fixed_architecture(model_tmp, 'checkpoints/epoch_'+str(epoch)+'.json')
@@ -190,7 +192,6 @@ class Trainer(BaseTrainer):
                 plt.savefig('plots/tsne_arch_search_'+ str(epoch) + '_' + timenow + '.png')
                 
                 # Loss and gradient plots
-                timenow = str(datetime.now()).replace('-', '').replace(' ', '').replace(':', '').replace('.', '')
                 
                 fig, ax = plt.subplots()
                 ax.plot(loss_arc, label='Architecture loss')
