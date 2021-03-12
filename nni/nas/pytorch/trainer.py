@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import time
+import nunpy as np
 # sys.path.append('../../../examples/nas/darts')
 from .model import CNN
 from sklearn.manifold import TSNE
