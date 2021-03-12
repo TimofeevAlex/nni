@@ -7,7 +7,7 @@ import os
 import time
 # sys.path.append('../../../examples/nas/darts')
 from .model import CNN
-
+from sklearn.manifold import TSNE
 from abc import abstractmethod
 from datetime import datetime 
 import matplotlib.pyplot as plt
