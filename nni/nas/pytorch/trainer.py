@@ -5,7 +5,8 @@ import json
 import logging
 import os
 import time
-from model import CNN
+# sys.path.append('../darts/')
+from .model import CNN
 
 from abc import abstractmethod
 from datetime import datetime 
