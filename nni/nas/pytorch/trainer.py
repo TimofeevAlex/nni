@@ -5,6 +5,8 @@ import json
 import logging
 import os
 import time
+from model import CNN
+
 from abc import abstractmethod
 from datetime import datetime 
 import matplotlib.pyplot as plt
@@ -152,7 +154,7 @@ class Trainer(BaseTrainer):
                 callback.on_epoch_begin(epoch)
 
             # training
-            print("Epoch %d Training", epoch + 1)
+            print("Epoch {} Training".format(epoch + 1))
             loss_arc_ep, loss_w_ep, grad_norm_w_ep, grad_norm_arc_ep  = self.train_one_epoch(epoch)
             loss_arc.append(loss_arc_ep)
             loss_w.append(loss_w_ep)
@@ -161,7 +163,7 @@ class Trainer(BaseTrainer):
             
             if validate and (epoch % 5) == 0:
                 # validation
-                print("Epoch %d Validating", epoch + 1)
+                print("Epoch {} Validating".format(epoch + 1))
                 loss_val_ep, Xs, ys = self.validate_one_epoch(epoch)
                 loss_val.append(loss_val_ep)
 
