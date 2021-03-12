@@ -171,7 +171,7 @@ class Trainer(BaseTrainer):
         
             if epoch % 5 == 0:
                 # Arch visualization
-                model_tmp = copy.deepcopy(model)
+                model_tmp = copy.deepcopy(self.model)
                 apply_fixed_architecture(model_tmp, 'checkpoints/epoch_'+str(epoch)+'.json')
                 viz = make_dot(model_tmp(torch.rand((1, 3, 32, 32))), params=dict(list(model_tmp.named_parameters())))
                 viz.render("arch_vis/cnn_torchviz_" + str(epoch), format="png")
