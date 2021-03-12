@@ -184,7 +184,7 @@ class Trainer(BaseTrainer):
                                'dogs', 'frogs', 'horses', 'ships', 'trucks']
                 Xs_proj = TSNE(n_components=2).fit_transform(Xs)
                 fig, ax = plt.subplots()
-                for color in np.unique(ys.detach().numpy()):
+                for color in np.unique(ys):
                     ax.scatter(Xs_proj[ys==color, 0], Xs_proj[ys==color, 1], label=class_labels[color-1])
                 ax.legend()
                 plt.savefig('plots/tsne_arch_search_'+ str(epoch) + '_' + timenow + '.png')
