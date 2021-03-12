@@ -5,7 +5,9 @@ import json
 import logging
 import os
 import time
-import copy
+# sys.path.append('../../../examples/nas/darts')
+from .model import CNN
+
 from abc import abstractmethod
 from datetime import datetime 
 import matplotlib.pyplot as plt
@@ -171,7 +173,7 @@ class Trainer(BaseTrainer):
         
             if epoch % 5 == 0:
                 # Arch visualization
-                model_tmp = copy.deepcopy(self.model)
+                model_tmp = CNN(32, 3, args.channels, 128, args.layers)
                 apply_fixed_architecture(model_tmp, 'checkpoints/epoch_'+str(epoch)+'.json')
                 viz = make_dot(model_tmp(torch.rand((1, 3, 32, 32))), params=dict(list(model_tmp.named_parameters())))
                 viz.render("arch_vis/cnn_torchviz_" + str(epoch), format="png")
