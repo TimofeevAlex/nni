@@ -179,7 +179,7 @@ class Trainer(BaseTrainer):
         
             if epoch % 5 == 0:
                 timenow = str(datetime.now()).replace('-', '').replace(' ', '').replace(':', '').replace('.', '')
-                # SAve weights
+                # Save weights
                 torch.save(self.model.state_dict(), os.path.join('supernet_models', 'supernet'+'_'+str(epoch)+'.pt'))
                 # Arch visualization
                 model_tmp = CNN(32, 3, args.channels, 128, args.layers)
