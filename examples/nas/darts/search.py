@@ -76,9 +76,10 @@ if __name__ == "__main__":
                    callbacks=[LRSchedulerCallback(lr_scheduler), ArchitectureCheckpoint("./checkpoints")],
                    temperature=args.temperature)
     loss_arc, loss_w, loss_val, grad_norm_arc, grad_norm_w = trainer.train(args, validate=True)
-    trainer.export(args.save_to)
     apply_fixed_architecture(model, 'checkpoints/epoch_' + str(args.epochs-1) + '.json')
-    torch.save(model.state_dict(), 'supernet_models/supernet_final_fixed.pt')    
+    torch.save(model.state_dict(), 'supernet_models/supernet_final_fixed.pt')  
+    trainer.export(args.save_to)
+  
     
 
         
