@@ -216,9 +216,7 @@ class Trainer(BaseTrainer):
                 ax.set_xlabel('Epoch')
                 ax.set_ylabel('Norm')
                 plt.savefig('plots/search_arch_grad_epoch_'+ str(epoch) + '_' + timenow + '.png')
-
-        apply_fixed_architecture(self.model, 'checkpoints/epoch_' + str(args.epochs-1) + '.json')
-        torch.save(model.state_dict(), 'supernet_models/supernet_final_fixed.pt')  
+ 
         return loss_arc, loss_w, loss_val, grad_norm_arc, grad_norm_w
 
 
