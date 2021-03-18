@@ -131,8 +131,8 @@ if __name__ == "__main__":
     if args.keep_training != None:
         model = torch.load(args.keep_training)
     else:
-#         model = CNN(32, 3, args.channels, 128, args.layers, auxiliary=False)
-        model = torch.load(args.keep_training)
+        model = CNN(32, 3, args.channels, 128, args.layers, auxiliary=False)
+        model.load_state_dict(torch.load(args.not_reinit))
         apply_fixed_architecture(model, args.arc_checkpoint)
         model.linear = nn.Sequential(nn.Linear(model.linear.in_features, model.linear.in_features), nn.ReLU(), model.linear)
    
