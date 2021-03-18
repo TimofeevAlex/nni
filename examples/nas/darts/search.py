@@ -75,6 +75,8 @@ if __name__ == "__main__":
                    temperature=args.temperature)
     loss_arc, loss_w, loss_val, grad_norm_arc, grad_norm_w = trainer.train(args, validate=True)
     trainer.export(args.save_to)
+    apply_fixed_architecture(model, 'epoch_' + str(arg.epochs) + '.json')
+    torch.save(model.state_dict(), 'supernet_models/supernet_final_fixed.pt')    
     
 
         
