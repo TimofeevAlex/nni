@@ -16,6 +16,8 @@ from model import CNN
 sys.path.append('../../../nni/nas/pytorch/')
 from callbacks import ArchitectureCheckpoint, LRSchedulerCallback
 from utils import accuracy
+from fixed import apply_fixed_architecture
+
 
 import matplotlib.pyplot as plt 
 sys.path.append('../../../nni/algorithms/nas/pytorch/')
@@ -75,7 +77,7 @@ if __name__ == "__main__":
                    temperature=args.temperature)
     loss_arc, loss_w, loss_val, grad_norm_arc, grad_norm_w = trainer.train(args, validate=True)
     trainer.export(args.save_to)
-    apply_fixed_architecture(model, 'epoch_' + str(arg.epochs) + '.json')
+    apply_fixed_architecture(model, 'checkpoints/epoch_' + str(arg.epochs) + '.json')
     torch.save(model.state_dict(), 'supernet_models/supernet_final_fixed.pt')    
     
 
