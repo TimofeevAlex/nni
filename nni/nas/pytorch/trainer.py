@@ -151,6 +151,11 @@ class Trainer(BaseTrainer):
         except OSError as error:  
             print(error)
         
+        try:  
+            os.mkdir('supernet_models')  
+        except OSError as error:  
+            print(error)
+        
         for epoch in range(self.num_epochs):
             for callback in self.callbacks:
                 callback.on_epoch_begin(epoch)
@@ -174,7 +179,8 @@ class Trainer(BaseTrainer):
         
             if epoch % 5 == 0:
                 timenow = str(datetime.now()).replace('-', '').replace(' ', '').replace(':', '').replace('.', '')
-                
+                # SAve weights
+                torch.save(self.model, os.path.join('supernet_models', 'supernet'+'_'+str(epoch)+'.pt'))
                 # Arch visualization
                 model_tmp = CNN(32, 3, args.channels, 128, args.layers)
                 apply_fixed_architecture(model_tmp, 'checkpoints/epoch_'+str(epoch)+'.json')
@@ -182,12 +188,10 @@ class Trainer(BaseTrainer):
                 viz.render("arch_vis/cnn_torchviz_" + str(epoch), format="png")
                 
                 # T-SNE
-                class_labels= ['airplanes', 'cars', 'birds', 'cats', 'deer',\
-                               'dogs', 'frogs', 'horses', 'ships', 'trucks']
                 Xs_proj = TSNE(n_components=2).fit_transform(Xs)
                 fig, ax = plt.subplots()
                 for color in np.unique(ys):
-                    ax.scatter(Xs_proj[ys==color, 0], Xs_proj[ys==color, 1], label=class_labels[color-1])
+                    ax.scatter(Xs_proj[ys==color, 0], Xs_proj[ys==color, 1], label=self.dataset_train.classes[color-1])
                 ax.legend()
                 plt.savefig('plots/tsne_arch_search_'+ str(epoch) + '_' + timenow + '.png')
                 

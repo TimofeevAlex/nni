@@ -21,7 +21,7 @@ sys.path.append('../../../nni/nas/pytorch/')
 from fixed import apply_fixed_architecture
 from utils_ import AverageMeter
 import matplotlib.pyplot as plt 
-
+from sklearn.manifold import TSNE
 logger = logging.getLogger('nni')
 
 
@@ -92,26 +92,26 @@ def ssl_train(config, train_loader, model, optimizer, criterion, epoch):
 
     return np.mean(losses_), np.mean(grad_norm_w)
 
-    def validate_one_epoch(config, model, test_loader, criterion, epoch):
-        losses = []
-        with torch.no_grad():
-            self.mutator.reset()
-            for step, (X, _) in enumerate(test_loader):
-                X = torch.cat(X, dim=0)
-                X = X.to(device)
-                features = model(X)
-                logits, labels = info_nce_loss(features)
-                loss = criterion(logits, labels)
-                losses.append(loss.item())
-                if step == 0:
-                    Xs = features[:config.batch_size]
-                    ys = y
-                Xs = torch.cat([Xs, features[:config.batch_size]])
-                ys = torch.cat([ys, y])
-                if config.log_frequency is not None and step % config.log_frequency == 0:
-                    print("Epoch [{}/{}] Step [{}/{}]  {}".format(epoch + 1,
-                                config.epochs, step + 1, len(test_loader), loss))
-        return np.mean(losses), Xs.detach().cpu().numpy(), ys.detach().cpu().numpy()
+def validate_one_epoch(config, model, test_loader, criterion, epoch):
+    losses = []
+    with torch.no_grad():
+        self.mutator.reset()
+        for step, (X, y) in enumerate(test_loader):
+            X = torch.cat(X, dim=0)
+            X = X.to(device)
+            features = model(X)
+            logits, labels = info_nce_loss(features, config)
+            loss = criterion(logits, labels)
+            losses.append(loss.item())
+            if step == 0:
+                Xs = features[:config.batch_size]
+                ys = y
+            Xs = torch.cat([Xs, features[:config.batch_size]])
+            ys = torch.cat([ys, y])
+            if config.log_frequency is not None and step % config.log_frequency == 0:
+                print("Epoch [{}/{}] Step [{}/{}]  {}".format(epoch + 1,
+                            config.epochs, step + 1, len(test_loader), loss))
+    return np.mean(losses), Xs.detach().cpu().numpy(), ys.detach().cpu().numpy()
         
 if __name__ == "__main__":
     parser = ArgumentParser("darts")
@@ -124,13 +124,15 @@ if __name__ == "__main__":
     parser.add_argument("--temperature", default=0.07, type=float)
     parser.add_argument("--channels", default=36, type=int)
     parser.add_argument("--keep-training", default=None, type=str)
+    parser.add_argument("--not-reinit", default='supernet_models/supernet_epoch_30')
 
     args = parser.parse_args()
     
     if args.keep_training != None:
         model = torch.load(args.keep_training)
     else:
-        model = CNN(32, 3, args.channels, 128, args.layers, auxiliary=False)
+#         model = CNN(32, 3, args.channels, 128, args.layers, auxiliary=False)
+        model = torch.load(args.keep_training)
         apply_fixed_architecture(model, args.arc_checkpoint)
         model.linear = nn.Sequential(nn.Linear(model.linear.in_features, model.linear.in_features), nn.ReLU(), model.linear)
    
@@ -180,14 +182,12 @@ if __name__ == "__main__":
             losses_val.append(loss_val_ep)
             
             # T-SNE
-            class_labels= ['airplanes', 'cars', 'birds', 'cats', 'deer',\
-                           'dogs', 'frogs', 'horses', 'ships', 'trucks']
             Xs_proj = TSNE(n_components=2).fit_transform(Xs)
             fig, ax = plt.subplots()
-            for color in np.unique(ys.detach().numpy()):
-                ax.scatter(Xs_proj[ys==color, 0], Xs_proj[ys==color, 1], label=class_labels[color-1])
+            for color in np.unique(ys):
+                ax.scatter(Xs_proj[ys==color, 0], Xs_proj[ys==color, 1], label=dataset_train.classes[color-1])
             ax.legend()
-            plt.savefig('plots/tsne_arch_search_'+ str(epoch) + '_' + timenow + '.png')  
+            plt.savefig('plots/tsne_ssl_'+ str(epoch) + '_' + timenow + '.png')  
             
             # Loss and gradient plots
             fig, ax = plt.subplots()
@@ -206,4 +206,4 @@ if __name__ == "__main__":
             ax.legend()
             ax.set_xlabel('Epoch')
             ax.set_ylabel('Norm')
-            plt.savefig('plots/ssl_training_grad_norm_epoch_'+ str(epoch) + '_' timenow + '.png')
+            plt.savefig('plots/ssl_training_grad_norm_epoch_'+ str(epoch) + '_' + timenow + '.png')

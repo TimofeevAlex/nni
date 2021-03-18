@@ -19,6 +19,7 @@ import datasets
 import utils
 from utils import accuracy
 from model import CNN
+from focal_loss import FocalLoss
 
 sys.path.append('../../../nni/nas/pytorch/')
 
@@ -132,11 +133,14 @@ def validate(config, valid_loader, model, criterion, epoch, cur_step):
     conf_mat = pd.DataFrame(conf_mat, columns=class_labels, index=class_labels)
     mask = np.ones_like(conf_mat)
     mask[np.triu_indices_from(mask)] = False
+    plt.figure(figsize=(10, 10))
     ax = sns.heatmap(conf_mat, mask=mask, cmap='coolwarm', annot=True)
     ax.set_xticklabels(ax.get_xticklabels(), rotation=45, horizontalalignment='right')
     ax.set_yticklabels(ax.get_yticklabels(), rotation=45, horizontalalignment='right')
     ax.set_title('Confusion matrix heatmap')
+    plt.tight_layout()
     plt.savefig('plots/confusion_matrix'+config.dataset+'.png')
+    
     return top1.avg, np.mean(losses_val)
 
 
@@ -151,6 +155,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--channels", default=36, type=int)
     parser.add_argument("--dataset", default='cifar5000')
+#     parser.add_argument("--distribution", default='in')
     args = parser.parse_args()
     
 
@@ -158,7 +163,7 @@ if __name__ == "__main__":
 
     model = nn.Sequential(model, nn.ReLU(), nn.Linear(128, 10))
     dataset_train, dataset_valid = datasets.get_dataset(args.dataset)# FIX TO 10%
-    criterion = nn.CrossEntropyLoss()
+    criterion = FocalLoss(gamma=2.)#nn.CrossEntropyLoss()#Add alphas
 
     model.to(device)
     criterion.to(device)
