@@ -132,9 +132,9 @@ if __name__ == "__main__":
         model = torch.load(args.keep_training)
     else:
         model = CNN(32, 3, args.channels, 128, args.layers, auxiliary=False)
+        model.linear = nn.Sequential(nn.Linear(model.linear.in_features, model.linear.in_features), nn.ReLU(), model.linear)
         model.load_state_dict(torch.load(args.not_reinit))
         apply_fixed_architecture(model, args.arc_checkpoint)
-        model.linear = nn.Sequential(nn.Linear(model.linear.in_features, model.linear.in_features), nn.ReLU(), model.linear)
    
     criterion = nn.CrossEntropyLoss()
 
