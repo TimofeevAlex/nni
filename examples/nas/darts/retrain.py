@@ -95,7 +95,6 @@ def ssl_train(config, train_loader, model, optimizer, criterion, epoch):
 def validate_one_epoch(config, model, test_loader, criterion, epoch):
     losses = []
     with torch.no_grad():
-        self.mutator.reset()
         for step, (X, y) in enumerate(test_loader):
             X = torch.cat(X, dim=0)
             X = X.to(device)
@@ -116,6 +115,8 @@ def validate_one_epoch(config, model, test_loader, criterion, epoch):
 if __name__ == "__main__":
     parser = ArgumentParser("darts")
     parser.add_argument("--layers", default=20, type=int)
+    parser.add_argument("--n-nodes", default=4, type=int)
+    parser.add_argument("--stem-multiplier", default=3, type=int)
     parser.add_argument("--batch-size", default=96, type=int)
     parser.add_argument("--log-frequency", default=10, type=int)
     parser.add_argument("--epochs", default=600, type=int)
@@ -131,7 +132,7 @@ if __name__ == "__main__":
     if args.keep_training != None:
         model = torch.load(args.keep_training)
     else:
-        model = CNN(32, 3, args.channels, 128, args.layers, auxiliary=False)
+        model = CNN(32, 3, args.channels, 128, args.layers, n_nodes=args.n_nodes, auxiliary=False, stem_multiplier=args.stem_multiplier)
         model.linear = nn.Sequential(nn.Linear(model.linear.in_features, model.linear.in_features), nn.ReLU(), model.linear)
         model.load_state_dict(torch.load(args.not_reinit))
         apply_fixed_architecture(model, args.arc_checkpoint)

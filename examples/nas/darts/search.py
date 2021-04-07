@@ -30,6 +30,8 @@ logger = logging.getLogger('nni')
 if __name__ == "__main__":
     parser = ArgumentParser("darts")
     parser.add_argument("--layers", default=8, type=int)
+    parser.add_argument("--n-nodes", default=4, type=int)
+    parser.add_argument("--stem-multiplier", default=3, type=int)
     parser.add_argument("--batch-size", default=64, type=int)
     parser.add_argument("--log-frequency", default=10, type=int)
     parser.add_argument("--epochs", default=50, type=int)
@@ -40,7 +42,7 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    model = CNN(32, 3, args.channels, 128, args.layers)
+    model = CNN(32, 3, args.channels, 128, args.layers, n_nodes=args.n_nodes, auxiliary=False, stem_multiplier=args.stem_multiplier)
     model.linear = nn.Sequential(nn.Linear(model.linear.in_features, model.linear.in_features), nn.ReLU(), model.linear)
     
     criterion = nn.CrossEntropyLoss()

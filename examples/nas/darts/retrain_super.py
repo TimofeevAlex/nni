@@ -139,7 +139,13 @@ def validate(config, valid_loader, model, criterion, epoch, cur_step):
     ax.set_yticklabels(ax.get_yticklabels(), rotation=45, horizontalalignment='right')
     ax.set_title('Confusion matrix heatmap')
     plt.tight_layout()
-    plt.savefig('plots/confusion_matrix'+config.dataset+'.png')
+    if config.no_pretrained:
+        if args.not_reinit != 'None':
+            plt.savefig('plots/nossl_confusion_matrix'+config.dataset+'.png')
+        else:
+            plt.savefig('plots/new_weights_nossl_confusion_matrix'+config.dataset+'.png')
+    else:
+        plt.savefig('plots/confusion_matrix'+config.dataset+'.png')
     
     return top1.avg, np.mean(losses_val)
 
@@ -147,21 +153,34 @@ def validate(config, valid_loader, model, criterion, epoch, cur_step):
 if __name__ == "__main__":
     parser = ArgumentParser("darts")
     parser.add_argument("--layers", default=20, type=int)
+    parser.add_argument("--n-nodes", default=4, type=int)
+    parser.add_argument("--stem-multiplier", default=3, type=int)
     parser.add_argument("--batch-size", default=96, type=int)
     parser.add_argument("--log-frequency", default=10, type=int)
     parser.add_argument("--epochs", default=600, type=int)
     parser.add_argument("--workers", default=4)
     parser.add_argument("--pretrained", default="./checkpoints/epoch_0.json")
-
+    parser.add_argument("--no-pretrained", default=False, type=bool)
     parser.add_argument("--channels", default=36, type=int)
     parser.add_argument("--dataset", default='cifar5000')
-#     parser.add_argument("--distribution", default='in')
+    parser.add_argument("--arc-checkpoint", default="./checkpoints/epoch_0.json")
+    parser.add_argument("--not-reinit", default='supernet_models/supernet_epoch_30')
+
     args = parser.parse_args()
     
+    if args.no_pretrained:
+        model = CNN(32, 3, args.channels, 128, args.layers, auxiliary=False, n_nodes=args.n_nodes, stem_multiplier=args.stem_multiplier)
+        model.linear = nn.Sequential(nn.Linear(model.linear.in_features, model.linear.in_features), nn.ReLU(), model.linear)
+        if args.not_reinit != 'None':
+            model.load_state_dict(torch.load(args.not_reinit))
+        apply_fixed_architecture(model, args.arc_checkpoint)
+    else:
+        model = torch.load(args.pretrained)
+        model = nn.Sequential(model, nn.ReLU(), nn.Linear(128, 10))
 
-    model = torch.load(args.pretrained)
 
-    model = nn.Sequential(model, nn.ReLU(), nn.Linear(128, 10))
+
+
     dataset_train, dataset_valid = datasets.get_dataset(args.dataset)# FIX TO 10%
     criterion = FocalLoss(gamma=2.)#nn.CrossEntropyLoss()#Add alphas
 
@@ -209,7 +228,7 @@ if __name__ == "__main__":
         best_top1 = max(best_top1, top1)
 
         lr_scheduler.step()
-        torch.save(model, os.path.join(models_dir, 'model'+'_'+str(epoch)+'_'+config.dataset+'.pt'))
+        torch.save(model, os.path.join(models_dir, 'model'+'_'+str(epoch)+'_'+args.dataset+'.pt'))
         
         if epoch % 5 == 0:
             fig, ax = plt.subplots()
@@ -219,7 +238,13 @@ if __name__ == "__main__":
             ax.legend()
             ax.set_xlabel('Epoch')
             ax.set_ylabel('Loss')
-            plt.savefig('plots/supervised_training_loss_epoch_'+ str(epoch) + '_' + config.dataset + '_'+ timenow + '.png')
+            if args.no_pretrained:
+                if args.not_reinit != 'None':
+                    plt.savefig('plots/nossl_training_loss_epoch_'+ str(epoch) + '_' + args.dataset + '_'+ timenow + '.png')
+                else:
+                    plt.savefig('plots/new_weights_nossl_training_loss_epoch_'+ str(epoch) + '_' + args.dataset + '_'+ timenow + '.png')
+            else:
+                plt.savefig('plots/supervised_training_loss_epoch_'+ str(epoch) + '_' + args.dataset + '_'+ timenow + '.png')
 
             fig, ax = plt.subplots()
             ax.plot(grad_norm_w, label='Norm')
@@ -227,6 +252,12 @@ if __name__ == "__main__":
             ax.legend()
             ax.set_xlabel('Epoch')
             ax.set_ylabel('Norm')
-            plt.savefig('plots/supervised_training_grad_norm_epoch_'+ str(epoch) + '_' + config.dataset + '_'+timenow + '.png')
+            if args.no_pretrained:
+                if args.not_reinit != 'None':
+                    plt.savefig('plots/nossl_training_grad_norm_epoch_'+ str(epoch) + '_' + args.dataset + '_'+ timenow + '.png')
+                else:
+                    plt.savefig('plots/new_weights_nossl_training_grad_norm_epoch_'+ str(epoch) + '_' + args.dataset + '_'+ timenow + '.png')
+            else:
+                plt.savefig('plots/supervised_training_grad_norm_epoch_'+ str(epoch) + '_' + args.dataset + '_'+timenow + '.png')
 
     print("Final best Prec@1 = {:.4%}".format(best_top1))

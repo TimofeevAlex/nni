@@ -89,10 +89,11 @@ def get_dataset(cls, cutout_length=0):
         dataset_train = CIFAR10(root="./data", train=True, download=True, transform=train_transform)
         dataset_train = torch.utils.data.Subset(dataset_train, np.arange(10000))
     if cls == "nucifar10":
-#         indices = np.load('indices_nucifar10.npy')
         dataset_train = CIFAR10(root="./data", train=True, download=True, transform=train_transform)
-        dataset_train = torch.utils.data.Subset(dataset_train, np.arange(10000))
-        dataset_train.data, dataset_train.targets = reduce_classes_dbset_longtailed(dataset_train, lt_factor=0.95)
+        # dataset_train = torch.utils.data.Subset(dataset_train, np.arange(10000))
+        dataset_train.data = dataset_train.data[:10000]
+        dataset_train.targets = dataset_train.targets[:10000]
+        dataset_train.data, dataset_train.targets = reduce_classes_dbset_longtailed(dataset_train, lt_factor=0.8)
         
     dataset_valid = CIFAR10(root="./data", train=False, download=True, transform=valid_transform)
     return dataset_train, dataset_valid
@@ -119,7 +120,7 @@ class ContrastiveLearningDataset:
                   self.get_simclr_pipeline_transform(32),
                   2),
                   download=True)
-        dataset_train.data, dataset_train.targets = reduce_classes_dbset_longtailed(dataset_train, lt_factor=0.9)
+        dataset_train.data, dataset_train.targets = reduce_classes_dbset_longtailed(dataset_train, lt_factor=0.8)
         return dataset_train, CIFAR10(self.root_folder, train=False,
                   transform=ContrastiveLearningViewGenerator(
                   self.get_simclr_pipeline_transform(32),
