@@ -131,7 +131,7 @@ class Trainer(BaseTrainer):
         """
         pass
 
-    def train(self, args, validate=True):
+    def train(self, args, cls_dist, validate=True):
         """
         Train ``num_epochs``.
         Trigger callbacks at the start and the end of each epoch.
@@ -162,7 +162,7 @@ class Trainer(BaseTrainer):
 
             # training
             print("Epoch {} Training".format(epoch + 1))
-            loss_arc_ep, loss_w_ep, grad_norm_w_ep, grad_norm_arc_ep  = self.train_one_epoch(epoch)
+            loss_arc_ep, loss_w_ep, grad_norm_w_ep, grad_norm_arc_ep  = self.train_one_epoch(epoch, cls_dist)
             loss_arc.append(loss_arc_ep)
             loss_w.append(loss_w_ep)
             grad_norm_arc.append(grad_norm_arc_ep)
@@ -171,7 +171,7 @@ class Trainer(BaseTrainer):
             if validate and (epoch % 5) == 0:
                 # validation
                 print("Epoch {} Validating".format(epoch + 1))
-                loss_val_ep, Xs, ys = self.validate_one_epoch(epoch)
+                loss_val_ep, Xs, ys = self.validate_one_epoch(epoch, cls_dist)
                 loss_val.append(loss_val_ep)
 
             for callback in self.callbacks:

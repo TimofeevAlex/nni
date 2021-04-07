@@ -23,6 +23,8 @@ import matplotlib.pyplot as plt
 sys.path.append('../../../nni/algorithms/nas/pytorch/')
 from darts import SSLDartsTrainer
 from darts import DartsMutator
+from focal_loss import FocalLoss
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 logger = logging.getLogger('nni')
@@ -45,14 +47,14 @@ if __name__ == "__main__":
     model = CNN(32, 3, args.channels, 128, args.layers, n_nodes=args.n_nodes, auxiliary=False, stem_multiplier=args.stem_multiplier)
     model.linear = nn.Sequential(nn.Linear(model.linear.in_features, model.linear.in_features), nn.ReLU(), model.linear)
     
-    criterion = nn.CrossEntropyLoss()
+    criterion = FocalLoss(gamma=2.)#nn.CrossEntropyLoss()
     model.to(device)
     criterion.to(device)
     optim = torch.optim.SGD(model.parameters(), 0.025, momentum=0.9, weight_decay=3.0E-4)
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, args.epochs, eta_min=0.001)
 
     dataset = datasets.ContrastiveLearningDataset('./data')
-    dataset_train, dataset_valid = dataset.get_dataset()
+    dataset_train, dataset_valid, cls_dist = dataset.get_dataset(cutout_length=10)
 
     try:  
         os.mkdir('arch_vis')  
@@ -77,7 +79,7 @@ if __name__ == "__main__":
                    device=device,
                    callbacks=[LRSchedulerCallback(lr_scheduler), ArchitectureCheckpoint("./checkpoints")],
                    temperature=args.temperature)
-    loss_arc, loss_w, loss_val, grad_norm_arc, grad_norm_w = trainer.train(args, validate=True)
+    loss_arc, loss_w, loss_val, grad_norm_arc, grad_norm_w = trainer.train(args, cls_dist, validate=True)
     trainer.export(args.save_to)
   
     

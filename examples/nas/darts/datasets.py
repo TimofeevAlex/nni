@@ -93,10 +93,10 @@ def get_dataset(cls, cutout_length=0):
         # dataset_train = torch.utils.data.Subset(dataset_train, np.arange(10000))
         dataset_train.data = dataset_train.data[:10000]
         dataset_train.targets = dataset_train.targets[:10000]
-        dataset_train.data, dataset_train.targets = reduce_classes_dbset_longtailed(dataset_train, lt_factor=0.8)
+        dataset_train.data, dataset_train.targets, cls_dist = reduce_classes_dbset_longtailed(dataset_train, lt_factor=0.8)
         
     dataset_valid = CIFAR10(root="./data", train=False, download=True, transform=valid_transform)
-    return dataset_train, dataset_valid
+    return dataset_train, dataset_valid, cls_dist
 
 class ContrastiveLearningDataset:
     def __init__(self, root_folder):
@@ -114,15 +114,15 @@ class ContrastiveLearningDataset:
                                               transforms.ToTensor()])
         return data_transforms
 
-    def get_dataset(self):
+    def get_dataset(self, cutout_length=10):
         dataset_train = CIFAR10(self.root_folder, train=True,
-                  transform=ContrastiveLearningViewGenerator(
+                  transform=transforms.Compose([Cutout(cutout_length), ContrastiveLearningViewGenerator(
                   self.get_simclr_pipeline_transform(32),
-                  2),
+                  2)]),
                   download=True)
-        dataset_train.data, dataset_train.targets = reduce_classes_dbset_longtailed(dataset_train, lt_factor=0.8)
+        dataset_train.data, dataset_train.targets, cls_dist = reduce_classes_dbset_longtailed(dataset_train, lt_factor=0.8)
         return dataset_train, CIFAR10(self.root_folder, train=False,
                   transform=ContrastiveLearningViewGenerator(
                   self.get_simclr_pipeline_transform(32),
                   2),
-                  download=True)
+                  download=True), cls_dist

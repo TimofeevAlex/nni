@@ -34,17 +34,19 @@ def reduce_classes_dbset_longtailed(db_set, permute=True, lt_factor=None):
     n_samples_class = int(db1.shape[0] // n_classes)
     # # create the undersampled lists of data and samples.
     data, classes = [], []
+    cls_dist = []
     for cl_id in range(n_classes):
         n_reduce = int(n_samples_class * lt_factor ** cl_id)
         samples = get_class_i(db1, lbls, cl_id, n_reduce=n_reduce)
         data.append(samples)
         classes.extend([cl_id] * n_reduce)
         print(n_reduce, len(data))
+        cls_dist.append(len(data))
     # # convert into numpy arrays.
     data, classes =  np.concatenate(data, axis=0), np.array(classes, dtype=np.int)
     if permute:
         # # optionally permute the data to avoid having them sorted.
         permut1 = np.random.permutation(len(classes))
         data, classes = data[permut1], classes[permut1]
-    return data, classes
+    return data, classes, np.array(cls_dist)
 

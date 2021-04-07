@@ -35,7 +35,7 @@ logger = logging.getLogger('nni')
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 writer = SummaryWriter()
 
-def train(config, train_loader, model, optimizer, criterion, epoch):
+def train(config, train_loader, model, optimizer, criterion, epoch, cls_dist):
     top1 = AverageMeter("top1")
     top5 = AverageMeter("top5")
     losses = AverageMeter("losses")
@@ -55,6 +55,7 @@ def train(config, train_loader, model, optimizer, criterion, epoch):
 
         optimizer.zero_grad()
         logits = model(x)
+        logits += torch.log(1. / cls_dist[y])
         loss = criterion(logits, y)
         losses_.append(loss.item())
         loss.backward()
@@ -89,7 +90,7 @@ def train(config, train_loader, model, optimizer, criterion, epoch):
     return np.mean(losses_), np.mean(grad_norm_w) 
 
 
-def validate(config, valid_loader, model, criterion, epoch, cur_step):
+def validate(config, valid_loader, model, criterion, epoch, cur_step, cls_dist):
     top1 = AverageMeter("top1")
     top5 = AverageMeter("top5")
     losses = AverageMeter("losses")
@@ -105,6 +106,7 @@ def validate(config, valid_loader, model, criterion, epoch, cur_step):
             bs = X.size(0)
 
             logits = model(X)
+            logits += torch.log(1. / cls_dist[y])
             y_pred = np.append(y_pred, np.argmax(logits.cpu().numpy(), axis=1))
         
             loss = criterion(logits, y)
@@ -141,11 +143,11 @@ def validate(config, valid_loader, model, criterion, epoch, cur_step):
     plt.tight_layout()
     if config.no_pretrained:
         if args.not_reinit != 'None':
-            plt.savefig('plots/nossl_confusion_matrix'+config.dataset+'.png')
+            plt.savefig('plots/nossl_confusion_matrix '+config.dataset+'.png')
         else:
-            plt.savefig('plots/new_weights_nossl_confusion_matrix'+config.dataset+'.png')
+            plt.savefig('plots/new_weights_nossl_confusion_matrix '+config.dataset+'.png')
     else:
-        plt.savefig('plots/confusion_matrix'+config.dataset+'.png')
+        plt.savefig('plots/confusion_matrix '+config.dataset+'.png')
     
     return top1.avg, np.mean(losses_val)
 
@@ -178,10 +180,7 @@ if __name__ == "__main__":
         model = torch.load(args.pretrained)
         model = nn.Sequential(model, nn.ReLU(), nn.Linear(128, 10))
 
-
-
-
-    dataset_train, dataset_valid = datasets.get_dataset(args.dataset)# FIX TO 10%
+    dataset_train, dataset_valid, cls_dist = datasets.get_dataset(args.dataset, cutout_length=10)# FIX TO 10%
     criterion = FocalLoss(gamma=2.)#nn.CrossEntropyLoss()#Add alphas
 
     model.to(device)
@@ -218,12 +217,12 @@ if __name__ == "__main__":
     grad_norm_w = []
     for epoch in range(args.epochs):
         # training
-        loss_ep, grad_norm_w_ep = train(args, train_loader, model, optimizer, criterion, epoch)
+        loss_ep, grad_norm_w_ep = train(args, train_loader, model, optimizer, criterion, epoch, cls_dist)
         losses.append(loss_ep)
         grad_norm_w.append(grad_norm_w_ep)
         # validation
         cur_step = (epoch + 1) * len(train_loader)
-        top1, loss_val_ep = validate(args, valid_loader, model, criterion, epoch, cur_step)
+        top1, loss_val_ep = validate(args, valid_loader, model, criterion, epoch, cur_step, cls_dist)
         losses_val.append(loss_val_ep)
         best_top1 = max(best_top1, top1)
 
