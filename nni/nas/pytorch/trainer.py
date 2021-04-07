@@ -182,7 +182,7 @@ class Trainer(BaseTrainer):
                 # Save weights
                 torch.save(self.model.state_dict(), os.path.join('supernet_models', 'supernet'+'_'+str(epoch)+'.pt'))
                 # Arch visualization
-                model_tmp = CNN(32, 3, args.channels, 128, args.layers)
+                model_tmp = CNN(32, 3, args.channels, 128, args.layers, n_nodes=args.n_nodes, auxiliary=False, stem_multiplier=args.stem_multiplier)
                 apply_fixed_architecture(model_tmp, 'checkpoints/epoch_'+str(epoch)+'.json')
                 viz = make_dot(model_tmp(torch.rand((1, 3, 32, 32))), params=dict(list(model_tmp.named_parameters())))
                 viz.render("arch_vis/cnn_torchviz_" + str(epoch), format="png")
