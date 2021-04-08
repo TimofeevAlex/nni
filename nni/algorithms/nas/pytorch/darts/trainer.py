@@ -170,7 +170,7 @@ class SSLDartsTrainer(Trainer):
         # assert similarity_matrix.shape == labels.shape
 
         # discard the main diagonal from both: labels and similarities matrix
-        mask = torch.eye(labels.shape[0], dtype=torch.bool).to(self.device)
+        mask = torch.eye(labels.shape[0]).bool().to(self.device)
         
         labels = labels[~mask].view(labels.shape[0], -1)
         
