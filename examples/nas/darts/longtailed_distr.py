@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 np.random.seed = 0
 
 def get_class_i(x, y, i, n_reduce=None):
@@ -48,5 +49,5 @@ def reduce_classes_dbset_longtailed(db_set, permute=True, lt_factor=None):
         # # optionally permute the data to avoid having them sorted.
         permut1 = np.random.permutation(len(classes))
         data, classes = data[permut1], classes[permut1]
-    return data, classes, np.array(cls_dist)
+    return data, classes, torch.from_numpy(np.array(cls_dist))
 

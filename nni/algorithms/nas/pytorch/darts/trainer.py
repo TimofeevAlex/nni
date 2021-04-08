@@ -85,7 +85,7 @@ class SSLDartsTrainer(Trainer):
                                                        num_workers=workers,
                                                        drop_last=True)
 
-    def train_one_epoch(self, epoch, cls_dist):
+    def train_one_epoch(self, epoch):
         self.model.train()
         self.mutator.train()
         meters = AverageMeterGroup()
@@ -115,7 +115,6 @@ class SSLDartsTrainer(Trainer):
             # phase 2: child network step
             self.optimizer.zero_grad()
             logits, labels, loss = self._logits_and_loss(trn_X)
-            logits += torch.log(1. / cls_dist[y])            
             loss_w.append(loss.item())
             loss.backward()
 #             nn.utils.clip_grad_norm_(self.model.parameters(), 5.)  # gradient clipping
@@ -135,7 +134,7 @@ class SSLDartsTrainer(Trainer):
                             self.num_epochs, step + 1, len(self.train_loader), meters))
         return np.mean(loss_arc), np.mean(loss_w), np.mean(grad_norm_arc), np.mean(grad_norm_w)
 
-    def validate_one_epoch(self, epoch, cls_dist):
+    def validate_one_epoch(self, epoch):
         self.model.eval()
         self.mutator.eval()
         losses = []
@@ -146,7 +145,6 @@ class SSLDartsTrainer(Trainer):
                 X = X.to(self.device)
                 features = self.model(X)
                 logits, labels = self.info_nce_loss(features)
-                logits += torch.log(1. / cls_dist[y])
                 loss = self.loss(logits, labels)
                 losses.append(loss.item())
                 if step == 0:

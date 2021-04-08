@@ -163,6 +163,7 @@ if __name__ == "__main__":
     parser.add_argument("--workers", default=4)
     parser.add_argument("--pretrained", default="./checkpoints/epoch_0.json")
     parser.add_argument("--no-pretrained", default=False, type=bool)
+    parser.add_argument("--drop-path-prob", default=0.2, type=float)
     parser.add_argument("--channels", default=36, type=int)
     parser.add_argument("--dataset", default='cifar5000')
     parser.add_argument("--arc-checkpoint", default="./checkpoints/epoch_0.json")
@@ -217,6 +218,8 @@ if __name__ == "__main__":
     grad_norm_w = []
     for epoch in range(args.epochs):
         # training
+        drop_prob = args.drop_path_prob * epoch / args.epochs
+        model.drop_path_prob(drop_prob)
         loss_ep, grad_norm_w_ep = train(args, train_loader, model, optimizer, criterion, epoch, cls_dist)
         losses.append(loss_ep)
         grad_norm_w.append(grad_norm_w_ep)

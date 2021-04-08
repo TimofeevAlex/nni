@@ -11,7 +11,7 @@ from view_generator import ContrastiveLearningViewGenerator
 from longtailed_distr import reduce_classes_dbset_longtailed
 from collections import defaultdict, deque
 import itertools
-
+torch.seed()
 
 class CIFAR5000(CIFAR10):
     def __init__(self, path, transforms, train=True):
@@ -47,8 +47,26 @@ class Cutout(object):
         self.length = length
 
     def __call__(self, img):
-        h, w = img.size(1), img.size(2)
+#         img = np.array(img)
+#         h, w = img.shape[0], img.shape[1]
+#         mask = np.ones((h, w), np.float32)
+#         y = np.random.randint(h)
+#         x = np.random.randint(w)
+#         y1 = np.clip(y - self.length // 2, 0, h)
+#         y2 = np.clip(y + self.length // 2, 0, h)
+#         x1 = np.clip(x - self.length // 2, 0, w)
+#         x2 = np.clip(x + self.length // 2, 0, w)
+
+#         mask[y1: y2, x1: x2] = 0.
+#         mask = mask.astype(int)
+# #         img = torch.from_numpy(img)
+#         img = np.transpose(img, [2, 0, 1])#mask.unsqueeze(-1).expand_as(img)
+#         img *= mask
+        h = img.size(1)
+        w = img.size(2)
+
         mask = np.ones((h, w), np.float32)
+
         y = np.random.randint(h)
         x = np.random.randint(w)
 
@@ -58,11 +76,11 @@ class Cutout(object):
         x2 = np.clip(x + self.length // 2, 0, w)
 
         mask[y1: y2, x1: x2] = 0.
+
         mask = torch.from_numpy(mask)
         mask = mask.expand_as(img)
-        img *= mask
-
-        return img
+        img = img * mask
+        return transforms.ToPILImage()(img)
 
 
 def get_dataset(cls, cutout_length=0):
@@ -115,14 +133,22 @@ class ContrastiveLearningDataset:
         return data_transforms
 
     def get_dataset(self, cutout_length=10):
+        MEAN = [0.49139968, 0.48215827, 0.44653124]
+        STD = [0.24703233, 0.24348505, 0.26158768]
+
+        normalize = [
+            transforms.ToTensor(),
+            transforms.Normalize(MEAN, STD)
+        ]
         dataset_train = CIFAR10(self.root_folder, train=True,
-                  transform=transforms.Compose([Cutout(cutout_length), ContrastiveLearningViewGenerator(
+                  transform=transforms.Compose(normalize+[Cutout(cutout_length), ContrastiveLearningViewGenerator(
                   self.get_simclr_pipeline_transform(32),
                   2)]),
                   download=True)
         dataset_train.data, dataset_train.targets, cls_dist = reduce_classes_dbset_longtailed(dataset_train, lt_factor=0.8)
-        return dataset_train, CIFAR10(self.root_folder, train=False,
-                  transform=ContrastiveLearningViewGenerator(
-                  self.get_simclr_pipeline_transform(32),
-                  2),
-                  download=True), cls_dist
+        dataset_valid = CIFAR10(self.root_folder, train=False,
+                                  transform=normalize+[ContrastiveLearningViewGenerator(
+                                  self.get_simclr_pipeline_transform(32),
+                                  2)],
+                                  download=True)
+        return dataset_train, dataset_valid, cls_dist

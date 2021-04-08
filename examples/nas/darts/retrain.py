@@ -60,7 +60,7 @@ def info_nce_loss(features, config):
         logits = logits / config.temperature
         return logits, labels
 
-def ssl_train(config, train_loader, model, optimizer, criterion, epoch, cls_dist):
+def ssl_train(config, train_loader, model, optimizer, criterion, epoch):
     model.train()
     losses = AverageMeter("losses")
     losses_ = []
@@ -73,7 +73,6 @@ def ssl_train(config, train_loader, model, optimizer, criterion, epoch, cls_dist
         optimizer.zero_grad()
         features = model(trn_X)
         logits, labels = info_nce_loss(features, config)
-        logits += torch.log(1. / cls_dist[y])
         loss = criterion(logits, labels)
         losses_.append(loss.item())
         loss.backward()   
@@ -93,7 +92,7 @@ def ssl_train(config, train_loader, model, optimizer, criterion, epoch, cls_dist
 
     return np.mean(losses_), np.mean(grad_norm_w)
 
-def validate_one_epoch(config, model, test_loader, criterion, epoch, cls_dist):
+def validate_one_epoch(config, model, test_loader, criterion, epoch):
     losses = []
     with torch.no_grad():
         for step, (X, y) in enumerate(test_loader):
@@ -101,7 +100,6 @@ def validate_one_epoch(config, model, test_loader, criterion, epoch, cls_dist):
             X = X.to(device)
             features = model(X)
             logits, labels = info_nce_loss(features, config)
-            logits += torch.log(1. / cls_dist[y])
             loss = criterion(logits, labels)
             losses.append(loss.item())
             if step == 0:
@@ -148,7 +146,7 @@ if __name__ == "__main__":
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.epochs, eta_min=1E-6)
     
     dataset = datasets.ContrastiveLearningDataset('./data')
-    dataset_train, dataset_valid, cls_dist = dataset.get_dataset(cutout_length=10)
+    dataset_train, dataset_valid, _ = dataset.get_dataset(cutout_length=10)
     train_loader = torch.utils.data.DataLoader(dataset_train,
                                                 batch_size=args.batch_size,
                                                 num_workers=args.workers,
@@ -175,13 +173,13 @@ if __name__ == "__main__":
     grad_norm_w = []
     os.mkdir(models_dir)
     for epoch in range(args.epochs):
-        loss_ep, grad_norm_w_ep = ssl_train(args, train_loader, model, optimizer, criterion, epoch, cls_dist)
+        loss_ep, grad_norm_w_ep = ssl_train(args, train_loader, model, optimizer, criterion, epoch)
         losses.append(loss_ep)
         grad_norm_w.append(grad_norm_w_ep)
         torch.save(model, os.path.join(models_dir, 'model'+'_'+str(epoch)+'.pt'))
         
         if epoch % 5 == 0:
-            loss_val_ep, Xs, ys = validate_one_epoch(args, model, test_loader, criterion, epoch, cls_dist)
+            loss_val_ep, Xs, ys = validate_one_epoch(args, model, test_loader, criterion, epoch)
             losses_val.append(loss_val_ep)
             
             # T-SNE
