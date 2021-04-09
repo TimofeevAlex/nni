@@ -55,7 +55,7 @@ def train(config, train_loader, model, optimizer, criterion, epoch, cls_dist):
 
         optimizer.zero_grad()
         logits = model(x)
-        logits += torch.log(1. / cls_dist[y])
+        logits += torch.log(1. / cls_dist.to(device).float())
         loss = criterion(logits, y)
         losses_.append(loss.item())
         loss.backward()
@@ -106,7 +106,8 @@ def validate(config, valid_loader, model, criterion, epoch, cur_step, cls_dist):
             bs = X.size(0)
 
             logits = model(X)
-            logits += torch.log(1. / cls_dist[y])
+            print(logits.shape, y.shape, cls_dist.shape)
+            logits += torch.log(1. / cls_dist.to(device).float())
             y_pred = np.append(y_pred, np.argmax(logits.cpu().numpy(), axis=1))
         
             loss = criterion(logits, y)
@@ -179,7 +180,8 @@ if __name__ == "__main__":
         apply_fixed_architecture(model, args.arc_checkpoint)
     else:
         model = torch.load(args.pretrained)
-        model = nn.Sequential(model, nn.ReLU(), nn.Linear(128, 10))
+    
+    model = nn.Sequential(model, nn.ReLU(), nn.Linear(128, 10))
 
     dataset_train, dataset_valid, cls_dist = datasets.get_dataset(args.dataset, cutout_length=10)# FIX TO 10%
     criterion = FocalLoss(gamma=2.)#nn.CrossEntropyLoss()#Add alphas
@@ -216,10 +218,11 @@ if __name__ == "__main__":
     losses = []
     losses_val = []
     grad_norm_w = []
+    main_model = [module for i, module in enumerate(model.modules()) if i != 0][0]
     for epoch in range(args.epochs):
         # training
         drop_prob = args.drop_path_prob * epoch / args.epochs
-        model.drop_path_prob(drop_prob)
+        main_model.drop_path_prob(drop_prob)
         loss_ep, grad_norm_w_ep = train(args, train_loader, model, optimizer, criterion, epoch, cls_dist)
         losses.append(loss_ep)
         grad_norm_w.append(grad_norm_w_ep)

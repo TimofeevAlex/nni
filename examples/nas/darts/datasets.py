@@ -11,7 +11,6 @@ from view_generator import ContrastiveLearningViewGenerator
 from longtailed_distr import reduce_classes_dbset_longtailed
 from collections import defaultdict, deque
 import itertools
-torch.seed()
 
 class CIFAR5000(CIFAR10):
     def __init__(self, path, transforms, train=True):
@@ -92,11 +91,12 @@ def get_dataset(cls, cutout_length=0):
     ]
     normalize = [
         transforms.ToTensor(),
-#         transforms.Normalize(MEAN, STD)
+        transforms.Normalize(MEAN, STD)
     ]
     cutout = []
     if cutout_length > 0:
         cutout.append(Cutout(cutout_length))
+        cutout.append(transforms.ToTensor())
 
     train_transform = transforms.Compose(transf + normalize + cutout)
     valid_transform = transforms.Compose(normalize)
@@ -147,8 +147,8 @@ class ContrastiveLearningDataset:
                   download=True)
         dataset_train.data, dataset_train.targets, cls_dist = reduce_classes_dbset_longtailed(dataset_train, lt_factor=0.8)
         dataset_valid = CIFAR10(self.root_folder, train=False,
-                                  transform=normalize+[ContrastiveLearningViewGenerator(
+                                  transform=transforms.Compose(normalize+[transforms.ToPILImage(), ContrastiveLearningViewGenerator(
                                   self.get_simclr_pipeline_transform(32),
-                                  2)],
+                                  2)]),
                                   download=True)
         return dataset_train, dataset_valid, cls_dist
