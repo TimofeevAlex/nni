@@ -106,8 +106,6 @@ def validate(config, valid_loader, model, criterion, epoch, cur_step, cls_dist):
             bs = X.size(0)
 
             logits = model(X)
-            print(logits.shape, y.shape, cls_dist.shape)
-            logits += torch.log(1. / cls_dist.to(device).float())
             y_pred = np.append(y_pred, np.argmax(logits.cpu().numpy(), axis=1))
         
             loss = criterion(logits, y)

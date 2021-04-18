@@ -98,7 +98,7 @@ def get_dataset(cls, cutout_length=0):
         cutout.append(Cutout(cutout_length))
         cutout.append(transforms.ToTensor())
 
-    train_transform = transforms.Compose(transf + normalize + cutout)
+    train_transform = transforms.Compose(transf + normalize) #+ cutout)
     valid_transform = transforms.Compose(normalize)
 
     if cls == "cifar10":
@@ -141,7 +141,8 @@ class ContrastiveLearningDataset:
             transforms.Normalize(MEAN, STD)
         ]
         dataset_train = CIFAR10(self.root_folder, train=True,
-                  transform=transforms.Compose(normalize+[Cutout(cutout_length), ContrastiveLearningViewGenerator(
+                  transform=transforms.Compose(normalize+[transforms.ToPILImage(),#Cutout(cutout_length), 
+			ContrastiveLearningViewGenerator(
                   self.get_simclr_pipeline_transform(32),
                   2)]),
                   download=True)
