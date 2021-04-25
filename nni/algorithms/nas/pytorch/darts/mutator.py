@@ -92,14 +92,14 @@ class DartsMutator(Mutator):
                 else:
                     result[mutable.key] = torch.ones(mutable.n_candidates, dtype=torch.bool, device=self.device())  # pylint: disable=not-callable
                     
-        ops = np.array(["zero",
-                        "maxpool", 
+        ops = np.array(["maxpool", 
                         "avgpool", 
                         "skipconnect",
                         "sepconv3x3",
                         "sepconv5x5",
                         "dilconv3x3",
-                        "dilconv5x5"])
+                        "dilconv5x5",
+                        "zero",])
         ops_dist = pd.DataFrame(ops_dist, index=ops)
         fig, [ax1, ax2] = plt.subplots(2, figsize=(10,10))
         g = sns.countplot(ops[np.argmax(ops_dist.to_numpy(), axis=0)], ax=ax1)
