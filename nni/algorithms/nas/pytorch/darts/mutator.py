@@ -7,6 +7,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 sys.path.append('../../../nni')
 from nas.pytorch.mutator import Mutator
 from nas.pytorch.mutables import LayerChoice, InputChoice
@@ -55,13 +60,16 @@ class DartsMutator(Mutator):
                 result[mutable.key] = torch.ones(mutable.n_candidates, dtype=torch.bool, device=self.device())
         return result
 
-    def sample_final(self):
+    def sample_final(self, epoch):
         result = dict()
         edges_max = dict()
+        ops_dist = dict()
         for mutable in self.mutables:
             if isinstance(mutable, LayerChoice):
-                max_val, index = torch.max(F.softmax(self.choices[mutable.key], dim=-1)[:-1], 0)
+                op_distr = F.softmax(self.choices[mutable.key], dim=-1)
+                max_val, index = torch.max(op_distr[:-1], 0)
                 edges_max[mutable.key] = max_val
+                ops_dist[mutable.key] = op_distr.detach().cpu()
                 result[mutable.key] = F.one_hot(index, num_classes=len(mutable)).view(-1).bool()
         for mutable in self.mutables:
             if isinstance(mutable, InputChoice):
@@ -83,4 +91,23 @@ class DartsMutator(Mutator):
                     result[mutable.key] = torch.tensor(selected_multihot, dtype=torch.bool, device=self.device())  # pylint: disable=not-callable
                 else:
                     result[mutable.key] = torch.ones(mutable.n_candidates, dtype=torch.bool, device=self.device())  # pylint: disable=not-callable
+                    
+        ops = np.array(["zero",
+                        "maxpool", 
+                        "avgpool", 
+                        "skipconnect",
+                        "sepconv3x3",
+                        "sepconv5x5",
+                        "dilconv3x3",
+                        "dilconv5x5"])
+        ops_dist = pd.DataFrame(ops_dist, index=ops)
+        fig, [ax1, ax2] = plt.subplots(2, figsize=(10,10))
+        g = sns.countplot(ops[np.argmax(ops_dist.to_numpy(), axis=0)], ax=ax1)
+        g.set_xticklabels(g.get_xticklabels(), rotation=45)
+
+        g = sns.heatmap(ops_dist, cmap='coolwarm', ax=ax2)
+        g.set_xticklabels(g.get_xticklabels(), rotation=45)
+        g.set_yticklabels(g.get_yticklabels(), rotation=45)
+        plt.tight_layout()
+        plt.savefig('ops_dist/'+str(epoch)+'_ops_distr.png')
         return result

@@ -143,7 +143,7 @@ class BaseMutator(nn.Module):
         """
         raise NotImplementedError
 
-    def export(self):
+    def export(self, epoch):
         """
         Export the data of all decisions. This should output the decisions of all the mutables, so that the whole
         network can be fully determined with these decisions for further training from scratch.

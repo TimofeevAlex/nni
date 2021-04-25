@@ -173,9 +173,6 @@ class Trainer(BaseTrainer):
                 print("Epoch {} Validating".format(epoch + 1))
                 loss_val_ep, Xs, ys = self.validate_one_epoch(epoch)
                 loss_val.append(loss_val_ep)
-
-            for callback in self.callbacks:
-                callback.on_epoch_end(epoch)
         
             if epoch % 5 == 0:
                 timenow = str(datetime.now()).replace('-', '').replace(' ', '').replace(':', '').replace('.', '')
@@ -217,6 +214,8 @@ class Trainer(BaseTrainer):
                 ax.set_ylabel('Norm')
                 plt.savefig('plots/search_arch_grad_epoch_'+ str(epoch) + '_' + timenow + '.png')
  
+            for callback in self.callbacks:
+                callback.on_epoch_end(epoch)
         return loss_arc, loss_w, loss_val, grad_norm_arc, grad_norm_w
 
 
@@ -226,7 +225,7 @@ class Trainer(BaseTrainer):
         """
         self.validate_one_epoch(-1)
 
-    def export(self, file):
+    def export(self, file, epoch):
         """
         Call ``mutator.export()`` and dump the architecture to ``file``.
 
@@ -235,7 +234,7 @@ class Trainer(BaseTrainer):
         file : str
             A file path. Expected to be a JSON.
         """
-        mutator_export = self.mutator.export()
+        mutator_export = self.mutator.export(epoch)
         with open(file, "w") as f:
             json.dump(mutator_export, f, indent=2, sort_keys=True, cls=TorchTensorEncoder)
 

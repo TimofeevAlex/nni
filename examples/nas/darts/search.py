@@ -47,7 +47,7 @@ if __name__ == "__main__":
     model = CNN(32, 3, args.channels, 128, args.layers, n_nodes=args.n_nodes, auxiliary=False, stem_multiplier=args.stem_multiplier)
     model.linear = nn.Sequential(nn.Linear(model.linear.in_features, model.linear.in_features), nn.ReLU(), model.linear)
     
-    criterion = nn.CrossEntropyLoss() #FocalLoss(gamma=2.)#nn.CrossEntropyLoss()
+    criterion = FocalLoss(gamma=2.)#nn.CrossEntropyLoss()
     model.to(device)
     criterion.to(device)
     optim = torch.optim.SGD(model.parameters(), 0.025, momentum=0.9, weight_decay=3.0E-4)
@@ -61,6 +61,11 @@ if __name__ == "__main__":
     except OSError as error:  
         print(error) 
         
+    try:  
+        os.mkdir('ops_dist')  
+    except OSError as error:  
+        print(error) 
+    
     try:  
         os.mkdir('plots')
     except OSError as error:  
@@ -80,7 +85,7 @@ if __name__ == "__main__":
                    callbacks=[LRSchedulerCallback(lr_scheduler), ArchitectureCheckpoint("./checkpoints")],
                    temperature=args.temperature)
     loss_arc, loss_w, loss_val, grad_norm_arc, grad_norm_w = trainer.train(args, validate=True)
-    trainer.export(args.save_to)
+    trainer.export(args.save_to, args.epochs)
   
     
 

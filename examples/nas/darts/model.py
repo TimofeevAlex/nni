@@ -144,15 +144,15 @@ class CNN(nn.Module):
         aux_logits = None
         for i, cell in enumerate(self.cells):
             s0, s1 = s1, cell(s0, s1)
-            if i == self.aux_pos and self.training:
-                aux_logits = self.aux_head(s1)
+#             if i == self.aux_pos and self.training:
+#                 aux_logits = self.aux_head(s1)
 
         out = self.gap(s1)
         out = out.view(out.size(0), -1)  # flatten
         logits = self.linear(out)
 
-        if aux_logits is not None:
-            return logits, aux_logits
+#         if aux_logits is not None:
+#             return logits, aux_logits
         return logits
 
     def drop_path_prob(self, p):

@@ -108,7 +108,7 @@ class ArchitectureCheckpoint(Callback):
         """
         dest_path = os.path.join(self.checkpoint_dir, "epoch_{}.json".format(epoch))
         _logger.info("Saving architecture to %s", dest_path)
-        self.trainer.export(dest_path)
+        self.trainer.export(dest_path, epoch)
 
 
 class ModelCheckpoint(Callback):

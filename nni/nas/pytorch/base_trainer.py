@@ -21,7 +21,7 @@ class BaseTrainer(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def export(self, file):
+    def export(self, file, epoch):
         """
         Override the method to export to file.
 

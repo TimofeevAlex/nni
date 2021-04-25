@@ -52,7 +52,7 @@ class Mutator(BaseMutator):
         """
         self._cache = self.sample_search()
 
-    def export(self):
+    def export(self, epoch):
         """
         Resample (for final) and return results.
 
@@ -61,7 +61,7 @@ class Mutator(BaseMutator):
         dict
             A mapping from key of mutables to decisions.
         """
-        sampled = self.sample_final()
+        sampled = self.sample_final(epoch)
         result = dict()
         for mutable in self.mutables:
             if not isinstance(mutable, (LayerChoice, InputChoice)):

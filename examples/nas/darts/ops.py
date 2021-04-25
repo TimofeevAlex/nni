@@ -134,3 +134,16 @@ class FactorizedReduce(nn.Module):
         out = torch.cat([self.conv1(x), self.conv2(x[:, :, 1:, 1:])], dim=1)
         out = self.bn(out)
         return out
+
+class Zero(nn.Module):
+    """
+    None operation
+    """
+    def __init__(self, stride):
+        super().__init__()
+        self.stride = stride
+
+    def forward(self, x):
+        if self.stride == 1:
+            return x.mul(0.)
+        return x[:,:,::self.stride,::self.stride].mul(0.)
