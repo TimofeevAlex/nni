@@ -187,9 +187,10 @@ if __name__ == "__main__":
     model.to(device)
     criterion.to(device)
 
-    optimizer = torch.optim.SGD(model.parameters(), 0.025, momentum=0.9, weight_decay=3.0E-4)
-    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.epochs, eta_min=1E-6)
-
+    optimizer = torch.optim.Adam(model.parameters(), 0.025)#, momentum=0.9, weight_decay=3.0E-4) #0.025
+    #lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [30, 60], gamma=0.5)    
+    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.epochs, eta_min=1E-6) #reduce on plateau
+    #lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=5, factor=0.5, threshold=0.001) 
     train_loader = torch.utils.data.DataLoader(dataset_train,
                                                batch_size=args.batch_size,
                                                shuffle=True,
