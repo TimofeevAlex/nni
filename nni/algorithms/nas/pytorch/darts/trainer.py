@@ -15,6 +15,7 @@ from nas.pytorch.trainer import Trainer
 from nas.pytorch.utils_ import AverageMeterGroup
 import numpy as np
 from .mutator import DartsMutator
+# from jvp import JacobianVectorProduct
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +107,11 @@ class SSLDartsTrainer(Trainer):
             loss_arc.append(self._backward(val_X).item())
             self.ctrl_optim.step()
             total_norm = 0
-            for p in self.model.parameters():
+#             grads = []
+#             params = []
+            for p in self.mutator.parameters():
+#                 params.append(p)
+#                 grads.append(p.grad)
                 param_norm = p.grad.data.norm(2)
                 total_norm += param_norm.item() ** 2
                 total_norm = total_norm ** (1. / 2)
@@ -121,11 +126,13 @@ class SSLDartsTrainer(Trainer):
             self.optimizer.step()
             total_norm = 0
             for p in self.model.parameters():
+#                 params.append(p)
+#                 grads.append(p.grad)
                 param_norm = p.grad.data.norm(2)
                 total_norm += param_norm.item() ** 2
                 total_norm = total_norm ** (1. / 2)
             grad_norm_w.append(total_norm)
-            
+            grads = torch.cat(grads)
             metrics = self.metrics(logits, labels)
             metrics["loss"] = loss.item()
             meters.update(metrics)
