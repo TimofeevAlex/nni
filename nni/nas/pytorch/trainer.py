@@ -156,6 +156,11 @@ class Trainer(BaseTrainer):
         except OSError as error:  
             print(error)
         
+        try:  
+            os.mkdir('mutator')  
+        except OSError as error:  
+            print(error)
+        
         for epoch in range(self.num_epochs):
             for callback in self.callbacks:
                 callback.on_epoch_begin(epoch)
@@ -178,6 +183,7 @@ class Trainer(BaseTrainer):
                 timenow = str(datetime.now()).replace('-', '').replace(' ', '').replace(':', '').replace('.', '')
                 # Save weights
                 torch.save(self.model.state_dict(), os.path.join('supernet_models', 'supernet'+'_'+str(epoch)+'.pt'))
+                torch.save(self.mutator.state_dict(), os.path.join('mutator', 'mutator'+'_'+str(epoch)+'.pt'))
                 # Arch visualization
 #                 model_tmp = CNN(32, 3, args.channels, 128, args.layers, n_nodes=args.n_nodes, auxiliary=False, stem_multiplier=args.stem_multiplier)
 #                 apply_fixed_architecture(model_tmp, 'checkpoints/epoch_'+str(epoch)+'.json')

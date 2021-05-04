@@ -70,6 +70,11 @@ if __name__ == "__main__":
         os.mkdir('plots')
     except OSError as error:  
         print(error) 
+     
+    try:  
+        os.mkdir('eigenvals')  
+    except OSError as error:  
+        print(error) 
         
     trainer = SSLDartsTrainer(model,
                    loss=criterion,
