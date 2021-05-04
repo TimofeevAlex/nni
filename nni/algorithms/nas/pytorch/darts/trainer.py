@@ -4,6 +4,7 @@ import os
 import sys
 import copy
 import logging
+import scipy.sparse.linalg as linalg
 
 import torch
 import torch.nn as nn
@@ -15,8 +16,8 @@ from nas.pytorch.trainer import Trainer
 from nas.pytorch.utils_ import AverageMeterGroup
 import numpy as np
 from .mutator import DartsMutator
-# from jvp import JacobianVectorProduct
-
+from .jvp import JacobianVectorProduct
+from torch import autograd
 logger = logging.getLogger(__name__)
 
 
@@ -94,7 +95,7 @@ class SSLDartsTrainer(Trainer):
         loss_w = []
         grad_norm_arc = []
         grad_norm_w = []
-        
+        rand_step = np.random.randint(0, 10)
         for step, ((trn_X, _), (val_X, _)) in enumerate(zip(self.train_loader, self.valid_loader)):
 
             trn_X = torch.cat(trn_X, dim=0)
@@ -104,41 +105,52 @@ class SSLDartsTrainer(Trainer):
 
             # phase 1. architecture step
             self.ctrl_optim.zero_grad()
-            loss_arc.append(self._backward(val_X).item())
+            loss_alpha = self._backward(val_X)
+            loss_arc.append(loss_alpha.item())
             self.ctrl_optim.step()
             total_norm = 0
-#             grads = []
-#             params = []
+            params = []
+            grads = []
             for p in self.mutator.parameters():
-#                 params.append(p)
-#                 grads.append(p.grad)
+                params.append(p)
+                grads.append(p.grad.data)
                 param_norm = p.grad.data.norm(2)
                 total_norm += param_norm.item() ** 2
                 total_norm = total_norm ** (1. / 2)
             grad_norm_arc.append(total_norm)
-            
             # phase 2: child network step
             self.optimizer.zero_grad()
             logits, labels, loss = self._logits_and_loss(trn_X)
             loss_w.append(loss.item())
             loss.backward()
-#             nn.utils.clip_grad_norm_(self.model.parameters(), 5.)  # gradient clipping
             self.optimizer.step()
             total_norm = 0
+            
             for p in self.model.parameters():
-#                 params.append(p)
-#                 grads.append(p.grad)
+                params.append(p)
+                grads.append(p.grad.data)
                 param_norm = p.grad.data.norm(2)
                 total_norm += param_norm.item() ** 2
                 total_norm = total_norm ** (1. / 2)
             grad_norm_w.append(total_norm)
-            grads = torch.cat(grads)
+            
             metrics = self.metrics(logits, labels)
             metrics["loss"] = loss.item()
             meters.update(metrics)
             if self.log_frequency is not None and step % self.log_frequency == 0:
                 print("Epoch [{}/{}] Step [{}/{}]  {}".format(epoch + 1,
                             self.num_epochs, step + 1, len(self.train_loader), meters))
+                
+                if (step == rand_step) and (epoch % 5 == 0):
+                    _, _, loss_x = self._logits_and_loss(val_X)
+                    gradx = autograd.grad(loss_x, self.mutator.parameters(), create_graph=True, allow_unused=True)
+                    _, _, loss_y = self._logits_and_loss(trn_X)
+                    grady = autograd.grad(loss_y, self.model.parameters(), create_graph=True, allow_unused=True)
+                    J = JacobianVectorProduct(list(gradx) + list(grady), params, force_numpy=True)
+                    dis_eigs = linalg.eigs(J, k=100, which='LI')[0]
+                    np.save('eigenvals/max_' + str(epoch), dis_eigs.imag.max())
+                    np.save('eigenvals/min_' + str(epoch), dis_eigs.imag.min())
+        
         return np.mean(loss_arc), np.mean(loss_w), np.mean(grad_norm_arc), np.mean(grad_norm_w)
 
     def validate_one_epoch(self, epoch):
