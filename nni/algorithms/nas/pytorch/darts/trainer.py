@@ -17,6 +17,7 @@ from nas.pytorch.utils_ import AverageMeterGroup
 import numpy as np
 from .mutator import DartsMutator
 from .jvp import JacobianVectorProduct
+from .extragradient import ExtraAdam
 from torch import autograd
 logger = logging.getLogger(__name__)
 
@@ -64,8 +65,8 @@ class SSLDartsTrainer(Trainer):
         super().__init__(model, mutator if mutator is not None else DartsMutator(model),
                          loss, metrics, optimizer, num_epochs, dataset_train, dataset_valid,
                          batch_size, workers, device, log_frequency, callbacks)
-        self.ctrl_optim = torch.optim.Adam(self.mutator.parameters(), arc_learning_rate, betas=(0.5, 0.999),
-                                           weight_decay=1.0E-3)
+        self.ctrl_optim = ExtraAdam(self.mutator.parameters(), arc_learning_rate, betas=(0.5, 0.999),
+                                    weight_decay=1.0E-3)
         self.temperature = temperature
         n_train = len(self.dataset_train)
         split = n_train // 2
@@ -107,12 +108,16 @@ class SSLDartsTrainer(Trainer):
             self.ctrl_optim.zero_grad()
             loss_alpha = self._backward(val_X)
             loss_arc.append(loss_alpha.item())
+#             if isinstance(self.ctrl_optim, Extragradient) and not self.alpha_has_extrapolated:
+            self.ctrl_optim.extrapolation()
+#                 self.alpha_has_extrapolated = True
+#             else:
             self.ctrl_optim.step()
+#                 self.alpha_has_extrapolated = False
+            
             total_norm = 0
-            params = []
             grads = []
             for p in self.mutator.parameters():
-                params.append(p)
                 grads.append(p.grad.data)
                 param_norm = p.grad.data.norm(2)
                 total_norm += param_norm.item() ** 2
@@ -123,11 +128,15 @@ class SSLDartsTrainer(Trainer):
             logits, labels, loss = self._logits_and_loss(trn_X)
             loss_w.append(loss.item())
             loss.backward()
+#             if isinstance(self.optimizer, Extragradient) and not self.alpha_has_extrapolated:
+            self.optimizer.extrapolation()
+#                 self.alpha_has_extrapolated = True
+#             else:
             self.optimizer.step()
+#                 self.alpha_has_extrapolated = False
+#             self.optimizer.step()
             total_norm = 0
-            
             for p in self.model.parameters():
-                params.append(p)
                 grads.append(p.grad.data)
                 param_norm = p.grad.data.norm(2)
                 total_norm += param_norm.item() ** 2
@@ -141,15 +150,15 @@ class SSLDartsTrainer(Trainer):
                 print("Epoch [{}/{}] Step [{}/{}]  {}".format(epoch + 1,
                             self.num_epochs, step + 1, len(self.train_loader), meters))
                 
-                if (step == rand_step) and (epoch % 5 == 0):
-                    _, _, loss_x = self._logits_and_loss(val_X)
-                    gradx = autograd.grad(loss_x, self.mutator.parameters(), create_graph=True, allow_unused=True)
-                    _, _, loss_y = self._logits_and_loss(trn_X)
-                    grady = autograd.grad(loss_y, self.model.parameters(), create_graph=True, allow_unused=True)
-                    J = JacobianVectorProduct(list(gradx) + list(grady), params, force_numpy=True)
-                    dis_eigs = linalg.eigs(J, k=100, which='LI')[0]
-                    np.save('eigenvals/max_' + str(epoch), dis_eigs.imag.max())
-                    np.save('eigenvals/min_' + str(epoch), dis_eigs.imag.min())
+#                 if (step == rand_step) and (epoch % 5 == 0):
+#                     _, _, loss_x = self._logits_and_loss(val_X)
+#                     gradx = autograd.grad(loss_x, self.mutator.parameters(), create_graph=True, allow_unused=True)
+#                     _, _, loss_y = self._logits_and_loss(trn_X)
+#                     grady = autograd.grad(loss_y, self.model.parameters(), create_graph=True, allow_unused=True)
+#                     J = JacobianVectorProduct(list(gradx) + list(grady), params, force_numpy=True)
+#                     dis_eigs = linalg.eigs(J, k=100, which='LI')[0]
+#                     np.save('eigenvals/max_' + str(epoch), dis_eigs.imag.max())
+#                     np.save('eigenvals/min_' + str(epoch), dis_eigs.imag.min())
         
         return np.mean(loss_arc), np.mean(loss_w), np.mean(grad_norm_arc), np.mean(grad_norm_w)
 
