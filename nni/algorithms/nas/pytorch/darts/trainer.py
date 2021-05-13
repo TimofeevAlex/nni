@@ -108,7 +108,7 @@ class SSLDartsTrainer(Trainer):
             self.ctrl_optim.zero_grad()
             loss_alpha = self._backward(val_X)
             loss_arc.append(loss_alpha.item())
-            if isinstance(self.ctrl_optim, Extragradient) and self.ctrl_optim.extrapolation:
+            if self.ctrl_optim.extrapolation:
                 self.ctrl_optim.extrapolation()
                 self.ctrl_optim.extrapolation = False
             else:
@@ -128,7 +128,7 @@ class SSLDartsTrainer(Trainer):
             logits, labels, loss = self._logits_and_loss(trn_X)
             loss_w.append(loss.item())
             loss.backward()
-            if isinstance(self.optimizer, Extragradient) and self.optimizer.extrapolation:
+            if self.optimizer.extrapolation:
                 self.optimizer.extrapolation()
                 self.optimizer.extrapolation = False
             else:
