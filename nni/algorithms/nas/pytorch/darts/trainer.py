@@ -108,12 +108,12 @@ class SSLDartsTrainer(Trainer):
             self.ctrl_optim.zero_grad()
             loss_alpha = self._backward(val_X)
             loss_arc.append(loss_alpha.item())
-            if self.ctrl_optim.extrapolation:
+            if self.ctrl_optim.extrapolated:
                 self.ctrl_optim.extrapolation()
-                self.ctrl_optim.extrapolation = False
+                self.ctrl_optim.extrapolated = False
             else:
                 self.ctrl_optim.step()
-                self.ctrl_optim.extrapolation = True
+                self.ctrl_optim.extrapolated = True
             
             total_norm = 0
             grads = []
@@ -128,12 +128,12 @@ class SSLDartsTrainer(Trainer):
             logits, labels, loss = self._logits_and_loss(trn_X)
             loss_w.append(loss.item())
             loss.backward()
-            if self.optimizer.extrapolation:
+            if self.optimizer.extrapolated:
                 self.optimizer.extrapolation()
-                self.optimizer.extrapolation = False
+                self.optimizer.extrapolated = False
             else:
                 self.optimizer.step()
-                self.optimizer.extrapolation = True
+                self.optimizer.extrapolated = True
 
             total_norm = 0
             for p in self.model.parameters():
