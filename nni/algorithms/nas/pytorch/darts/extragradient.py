@@ -22,6 +22,7 @@ class Extragradient(Optimizer):
     def __init__(self, params, defaults):
         super(Extragradient, self).__init__(params, defaults)
         self.params_copy = []
+        self.extrapolation = True
 
     def update(self, p, group):
         raise NotImplementedError
