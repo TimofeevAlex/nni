@@ -132,7 +132,7 @@ if __name__ == "__main__":
     if args.keep_training != None:
         model = torch.load(args.keep_training)
     else:
-        model = CNN(32, 3, args.channels, 128, args.layers, n_nodes=args.n_nodes, auxiliary=False, stem_multiplier=args.stem_multiplier)
+        model = CNN(28, 1, args.channels, 128, args.layers, n_nodes=args.n_nodes, auxiliary=False, stem_multiplier=args.stem_multiplier)
         model.linear = nn.Sequential(nn.Linear(model.linear.in_features, model.linear.in_features), nn.ReLU(), model.linear)
         model.load_state_dict(torch.load(args.not_reinit))
         apply_fixed_architecture(model, args.arc_checkpoint)
@@ -146,7 +146,7 @@ if __name__ == "__main__":
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.epochs, eta_min=1E-6)
     
     dataset = datasets.ContrastiveLearningDataset('./data')
-    dataset_train, dataset_valid, _ = dataset.get_dataset(cutout_length=10)
+    dataset_train, dataset_valid = dataset.get_dataset(cutout_length=10)
     train_loader = torch.utils.data.DataLoader(dataset_train,
                                                 batch_size=args.batch_size,
                                                 num_workers=args.workers,

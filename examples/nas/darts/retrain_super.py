@@ -129,8 +129,10 @@ def validate(config, valid_loader, model, criterion, epoch, cur_step, cls_dist):
     
     # Confusion matrix
     conf_mat = confusion_matrix(y_true, y_pred)
-    class_labels= ['airplanes', 'cars', 'birds', 'cats', 'deer',\
-                   'dogs', 'frogs', 'horses', 'ships', 'trucks']
+#     class_labels= ['airplanes', 'cars', 'birds', 'cats', 'deer',\
+#                    'dogs', 'frogs', 'horses', 'ships', 'trucks']
+    
+    class_labels = ["Negative", "Positive"]
     conf_mat = pd.DataFrame(conf_mat, columns=class_labels, index=class_labels)
     mask = np.ones_like(conf_mat)
     mask[np.triu_indices_from(mask)] = False
@@ -171,7 +173,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     if args.no_pretrained:
-        model = CNN(32, 3, args.channels, 128, args.layers, auxiliary=False, n_nodes=args.n_nodes, stem_multiplier=args.stem_multiplier)
+        model = CNN(28, 1, args.channels, 128, args.layers, auxiliary=False, n_nodes=args.n_nodes, stem_multiplier=args.stem_multiplier)
         model.linear = nn.Sequential(nn.Linear(model.linear.in_features, model.linear.in_features), nn.ReLU(), model.linear)
         if args.not_reinit != 'None':
             model.load_state_dict(torch.load(args.not_reinit))

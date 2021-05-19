@@ -45,7 +45,7 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    model = CNN(32, 3, args.channels, 128, args.layers, n_nodes=args.n_nodes, auxiliary=False, stem_multiplier=args.stem_multiplier)
+    model = CNN(28, 1, args.channels, 128, args.layers, n_nodes=args.n_nodes, auxiliary=False, stem_multiplier=args.stem_multiplier)
     model.linear = nn.Sequential(nn.Linear(model.linear.in_features, model.linear.in_features), nn.ReLU(), model.linear)
     
     criterion = FocalLoss(gamma=2.)#nn.CrossEntropyLoss()
@@ -55,7 +55,7 @@ if __name__ == "__main__":
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, args.epochs, eta_min=0.001)
 
     dataset = datasets.ContrastiveLearningDataset('./data')
-    dataset_train, dataset_valid, _ = dataset.get_dataset(cutout_length=10)
+    dataset_train, dataset_valid = dataset.get_dataset(cutout_length=10)
 
     try:  
         os.mkdir('arch_vis')  

@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from torchvision import transforms
 from torchvision.datasets import CIFAR10, STL10
+from medmnist import ChestMNIST
 from torchvision.transforms import transforms
 from gaussian_blur import GaussianBlur
 from view_generator import ContrastiveLearningViewGenerator
@@ -83,8 +84,10 @@ class Cutout(object):
 
 
 def get_dataset(cls, cutout_length=0):
-    MEAN = [0.49139968, 0.48215827, 0.44653124]
-    STD = [0.24703233, 0.24348505, 0.26158768]
+#     MEAN = [0.49139968, 0.48215827, 0.44653124]
+#     STD = [0.24703233, 0.24348505, 0.26158768]
+    MEAN = [0.5]
+    STD = [0.5]
     transf = [
         transforms.RandomCrop(32, padding=4),
         transforms.RandomHorizontalFlip()
@@ -101,20 +104,28 @@ def get_dataset(cls, cutout_length=0):
     train_transform = transforms.Compose(transf + normalize) #+ cutout)
     valid_transform = transforms.Compose(normalize)
 
-    if cls == "cifar10":
-        dataset_train = CIFAR10(root="./data", train=True, download=True, transform=train_transform)
-    if cls == "cifar5000":
-        dataset_train = CIFAR10(root="./data", train=True, download=True, transform=train_transform)
-        dataset_train = torch.utils.data.Subset(dataset_train, np.arange(10000))
-    if cls == "nucifar10":
-        dataset_train = CIFAR10(root="./data", train=True, download=True, transform=train_transform)
-        # dataset_train = torch.utils.data.Subset(dataset_train, np.arange(10000))
-        dataset_train.data = dataset_train.data[:10000]
-        dataset_train.targets = dataset_train.targets[:10000]
-        dataset_train.data, dataset_train.targets, cls_dist = reduce_classes_dbset_longtailed(dataset_train, lt_factor=0.8)
+#     if cls == "cifar10":
+#         dataset_train = CIFAR10(root="./data", train=True, download=True, transform=train_transform)
+#     if cls == "cifar5000":
+#         dataset_train = CIFAR10(root="./data", train=True, download=True, transform=train_transform)
+#         dataset_train = torch.utils.data.Subset(dataset_train, np.arange(10000))
+#     if cls == "nucifar10":
+#         dataset_train = CIFAR10(root="./data", train=True, download=True, transform=train_transform)
+#         # dataset_train = torch.utils.data.Subset(dataset_train, np.arange(10000))
+#         dataset_train.data = dataset_train.data[:10000]
+#         dataset_train.targets = dataset_train.targets[:10000]
+#         dataset_train.data, dataset_train.targets, cls_dist = reduce_classes_dbset_longtailed(dataset_train, lt_factor=0.8)
         
-    dataset_valid = CIFAR10(root="./data", train=False, download=True, transform=valid_transform)
-    return dataset_train, dataset_valid, cls_dist
+#     dataset_valid = CIFAR10(root="./data", train=False, download=True, transform=valid_transform)
+    dataset_train = ChestMNIST(root="./data", split='train', transform=train_transform, download=True)
+#     dataset_train.data = dataset_train.data[:10000]
+#     dataset_train.targets = dataset_train.targets[:10000]
+#     dataset_train.data, dataset_train.targets, cls_dist = reduce_classes_dbset_longtailed(dataset_train, lt_factor=0.8)
+    dataset_train.targets = (dataset_train.targets.sum(1) != 0).astype(np.int)    
+    dataset_valid = ChestMNIST(root="./data", split='test', transform=valid_transform, download=True)
+    dataset_valid.targets = (dataset_valid.targets.sum(1) != 0).astype(np.int)
+    
+    return dataset_train, dataset_valid#, cls_dist
 
 class ContrastiveLearningDataset:
     def __init__(self, root_folder):
@@ -133,23 +144,40 @@ class ContrastiveLearningDataset:
         return data_transforms
 
     def get_dataset(self, cutout_length=10):
-        MEAN = [0.49139968, 0.48215827, 0.44653124]
-        STD = [0.24703233, 0.24348505, 0.26158768]
-
+#         MEAN = [0.49139968, 0.48215827, 0.44653124]
+#         STD = [0.24703233, 0.24348505, 0.26158768]
+        MEAN = [0.5]
+        STD = [0.5]
         normalize = [
             transforms.ToTensor(),
             transforms.Normalize(MEAN, STD)
         ]
-        dataset_train = CIFAR10(self.root_folder, train=True,
+#         dataset_train = CIFAR10(self.root_folder, train=True,
+#                   transform=transforms.Compose(normalize+[transforms.ToPILImage(),#Cutout(cutout_length), 
+#         ContrastiveLearningViewGenerator(
+#                   self.get_simclr_pipeline_transform(32),
+#                   2)]),
+#                   download=True)
+#         dataset_train.data, dataset_train.targets, cls_dist = reduce_classes_dbset_longtailed(dataset_train, lt_factor=0.8)
+#         dataset_valid = CIFAR10(self.root_folder, train=False,
+#                                   transform=transforms.Compose(normalize+[transforms.ToPILImage(), ContrastiveLearningViewGenerator(
+#                                   self.get_simclr_pipeline_transform(32),
+#                                   2)]),
+#                                   download=True)
+        dataset_train = ChestMNIST(root=self.root_folder, split='train',
                   transform=transforms.Compose(normalize+[transforms.ToPILImage(),#Cutout(cutout_length), 
 			ContrastiveLearningViewGenerator(
-                  self.get_simclr_pipeline_transform(32),
+                  self.get_simclr_pipeline_transform(28),
                   2)]),
                   download=True)
-        dataset_train.data, dataset_train.targets, cls_dist = reduce_classes_dbset_longtailed(dataset_train, lt_factor=0.8)
-        dataset_valid = CIFAR10(self.root_folder, train=False,
+        dataset_train.targets = (dataset_train.targets.sum(1) != 0).astype(np.int)
+        
+#         dataset_train.data, dataset_train.targets, cls_dist = reduce_classes_dbset_longtailed(dataset_train, lt_factor=0.8)
+        dataset_valid = ChestMNIST(root=self.root_folder, split='test',
                                   transform=transforms.Compose(normalize+[transforms.ToPILImage(), ContrastiveLearningViewGenerator(
-                                  self.get_simclr_pipeline_transform(32),
+                                  self.get_simclr_pipeline_transform(28),
                                   2)]),
                                   download=True)
-        return dataset_train, dataset_valid, cls_dist
+        dataset_valid.targets = (dataset_valid.targets.sum(1) != 0).astype(np.int)
+    
+        return dataset_train, dataset_valid#, cls_dist
