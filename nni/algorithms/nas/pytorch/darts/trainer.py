@@ -65,7 +65,7 @@ class SSLDartsTrainer(Trainer):
         super().__init__(model, mutator if mutator is not None else DartsMutator(model),
                          loss, metrics, optimizer, num_epochs, dataset_train, dataset_valid,
                          batch_size, workers, device, log_frequency, callbacks)
-        self.ctrl_optim = ExtraAdam(self.mutator.parameters(), arc_learning_rate, betas=(0.5, 0.999),
+        self.ctrl_optim = torch.optim.Adam(self.mutator.parameters(), arc_learning_rate, betas=(0.5, 0.999),
                                     weight_decay=1.0E-3)
         self.temperature = temperature
         n_train = len(self.dataset_train)
@@ -108,12 +108,13 @@ class SSLDartsTrainer(Trainer):
             self.ctrl_optim.zero_grad()
             loss_alpha = self._backward(val_X)
             loss_arc.append(loss_alpha.item())
-            if self.ctrl_optim.extrapolated:
-                self.ctrl_optim.extrapolation()
-                self.ctrl_optim.extrapolated = False
-            else:
-                self.ctrl_optim.step()
-                self.ctrl_optim.extrapolated = True
+            self.ctrl_optim.step()
+#             if self.ctrl_optim.extrapolated:
+#                 self.ctrl_optim.extrapolation()
+#                 self.ctrl_optim.extrapolated = False
+#             else:
+#                 self.ctrl_optim.step()
+#                 self.ctrl_optim.extrapolated = True
             
             total_norm = 0
             grads = []
@@ -128,12 +129,13 @@ class SSLDartsTrainer(Trainer):
             logits, labels, loss = self._logits_and_loss(trn_X)
             loss_w.append(loss.item())
             loss.backward()
-            if self.optimizer.extrapolated:
-                self.optimizer.extrapolation()
-                self.optimizer.extrapolated = False
-            else:
-                self.optimizer.step()
-                self.optimizer.extrapolated = True
+            self.optimizer.step()
+#             if self.optimizer.extrapolated:
+#                 self.optimizer.extrapolation()
+#                 self.optimizer.extrapolated = False
+#             else:
+#                 self.optimizer.step()
+#                 self.optimizer.extrapolated = True
 
             total_norm = 0
             for p in self.model.parameters():
