@@ -28,6 +28,7 @@ from fixed import apply_fixed_architecture
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt 
 import seaborn as sns
+from metrics import getAUC, getACC
 
 logger = logging.getLogger('nni')
 
@@ -86,7 +87,7 @@ def train(config, train_loader, model, optimizer, criterion, epoch, cls_dist):
 
         cur_step += 1
 
-    logger.info("Train: [{:3d}/{}] Final Prec@1 {:.4%}".format(epoch + 1, config.epochs, top1.avg))
+    print("Train: [{:3d}/{}] Final Prec@1 {:.4%}".format(epoch + 1, config.epochs, top1.avg))
     return np.mean(losses_), np.mean(grad_norm_w) 
 
 
@@ -106,7 +107,7 @@ def validate(config, valid_loader, model, criterion, epoch, cur_step, cls_dist):
             bs = X.size(0)
 
             logits = model(X)
-            y_pred = np.append(y_pred, np.argmax(logits.cpu().numpy(), axis=1))
+            y_pred = np.append(y_pred, nn.Sigmoid()(logits).cpu().numpy())#np.argmax(logits.cpu().numpy(), axis=1))
         
             loss = criterion(logits, y)
             losses_val.append(loss.item())
@@ -125,8 +126,10 @@ def validate(config, valid_loader, model, criterion, epoch, cur_step, cls_dist):
     writer.add_scalar("acc1/test", top1.avg, global_step=cur_step)
     writer.add_scalar("acc5/test", top5.avg, global_step=cur_step)
 
-    logger.info("Valid: [{:3d}/{}] Final Prec@1 {:.4%}".format(epoch + 1, config.epochs, top1.avg))
-    
+    print("Valid: [{:3d}/{}] Final Prec@1 {:.4%}".format(epoch + 1, config.epochs, top1.avg))
+    auc = getAUC(y_true, y_pred, 'binary-class')
+    acc = getACC(y_true, y_pred, 'binary-class')
+    print("Valid: [{:3d}/{}] AUC: {:.4%} ACC: {:.4%}".format(epoch + 1, config.epochs, auc, acc))
     # Confusion matrix
     conf_mat = confusion_matrix(y_true, y_pred)
 #     class_labels= ['airplanes', 'cars', 'birds', 'cats', 'deer',\
@@ -149,6 +152,8 @@ def validate(config, valid_loader, model, criterion, epoch, cur_step, cls_dist):
             plt.savefig('plots/new_weights_nossl_confusion_matrix '+config.dataset+'.png')
     else:
         plt.savefig('plots/confusion_matrix '+config.dataset+'.png')
+    
+    
     
     return top1.avg, np.mean(losses_val)
 
@@ -181,7 +186,7 @@ if __name__ == "__main__":
     else:
         model = torch.load(args.pretrained)
     
-    model = nn.Sequential(model, nn.ReLU(), nn.Linear(128, 10))
+    model = nn.Sequential(model, nn.ReLU(), nn.Linear(128, 2))
 
     dataset_train, dataset_valid, cls_dist = datasets.get_dataset(args.dataset, cutout_length=10)# FIX TO 10%
     criterion = FocalLoss(gamma=2.)#nn.CrossEntropyLoss()#Add alphas
