@@ -55,7 +55,7 @@ class DartsMutator(Mutator):
         result = dict()
         for mutable in self.mutables:
             if isinstance(mutable, LayerChoice):
-                result[mutable.key] = F.softmax(self.choices[mutable.key], dim=-1)[:-1]
+                result[mutable.key] = torch.sigmoid(self.choices[mutable.key])[:-1]
             elif isinstance(mutable, InputChoice):
                 result[mutable.key] = torch.ones(mutable.n_candidates, dtype=torch.bool, device=self.device())
         return result
@@ -66,7 +66,7 @@ class DartsMutator(Mutator):
         ops_dist = dict()
         for mutable in self.mutables:
             if isinstance(mutable, LayerChoice):
-                op_distr = F.softmax(self.choices[mutable.key], dim=-1)
+                op_distr = torch.sigmoid(self.choices[mutable.key])
                 max_val, index = torch.max(op_distr[:-1], 0)
                 edges_max[mutable.key] = max_val
                 ops_dist[mutable.key] = op_distr.detach().cpu()

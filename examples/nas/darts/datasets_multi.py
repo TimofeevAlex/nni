@@ -4,10 +4,9 @@
 import numpy as np
 import torch
 from torchvision import transforms
-from torchvision import datasets
 from torchvision.datasets import CIFAR10, STL10
 from medmnist import ChestMNIST
-# from torchvision.transforms import transforms
+from torchvision.transforms import transforms
 from gaussian_blur import GaussianBlur
 from view_generator import ContrastiveLearningViewGenerator
 from longtailed_distr import reduce_classes_dbset_longtailed
@@ -98,7 +97,6 @@ def get_dataset(cls, cutout_length=0):
         transforms.RandomHorizontalFlip()
     ]
     normalize = [
-        transforms.Grayscale(),
         transforms.ToTensor(),
         transforms.Normalize(MEAN, STD)
     ]
@@ -109,22 +107,27 @@ def get_dataset(cls, cutout_length=0):
 
     train_transform = transforms.Compose(transf + normalize + cutout)
     valid_transform = transforms.Compose(normalize)
-    target_transform = transforms.Compose([lambda x: x - 1])
-    
+
+#     if cls == "cifar10":
+#         dataset_train = CIFAR10(root="./data", train=True, download=True, transform=train_transform)
+#     if cls == "cifar5000":
+#         dataset_train = CIFAR10(root="./data", train=True, download=True, transform=train_transform)
+#         dataset_train = torch.utils.data.Subset(dataset_train, np.arange(10000))
+#     if cls == "nucifar10":
 #         dataset_train = CIFAR10(root="./data", train=True, download=True, transform=train_transform)
 #         # dataset_train = torch.utils.data.Subset(dataset_train, np.arange(10000))
 #         dataset_train.data = dataset_train.data[:10000]
 #         dataset_train.targets = dataset_train.targets[:10000]
 #         dataset_train.data, dataset_train.targets, cls_dist = reduce_classes_dbset_longtailed(dataset_train, lt_factor=0.8)
 #     dataset_valid = CIFAR10(root="./data", train=False, download=True, transform=valid_transform)
+    dataset_train = ChestMNIST(root="./data", split='train', transform=train_transform, download=True)
 #     dataset_train.data = dataset_train.data[:10000]
 #     dataset_train.targets = dataset_train.targets[:10000]
 #     dataset_train.data, dataset_train.targets, cls_dist = reduce_classes_dbset_longtailed(dataset_train, lt_factor=0.8)
-
-    train_dataset = datasets.ImageFolder('data/covid_small/', transform=train_transform, 
-                                         target_transform=target_transform)
-    valid_dataset = datasets.ImageFolder('data/covid_small/', transform=valid_transform,
-                                        target_transform=target_transform)
+#     dataset_train.targets = np.expand_dims((dataset_train.targets.sum(1) != 0).astype(np.int), -1)  
+    dataset_valid = ChestMNIST(root="./data", split='test', transform=valid_transform, download=True)
+#     dataset_valid.targets = np.expand_dims((dataset_valid.targets.sum(1) != 0).astype(np.int), -1)
+    
     return dataset_train, dataset_valid#, cls_dist
 
 class ContrastiveLearningDataset:
@@ -170,7 +173,7 @@ class ContrastiveLearningDataset:
                   self.get_simclr_pipeline_transform(28),
                   2)]),
                   download=True)
-        dataset_train.targets = (dataset_train.targets.sum(1) != 0).astype(np.int)
+#         dataset_train.targets = (dataset_train.targets.sum(1) != 0).astype(np.int)
         
 #         dataset_train.data, dataset_train.targets, cls_dist = reduce_classes_dbset_longtailed(dataset_train, lt_factor=0.8)
         dataset_valid = ChestMNIST(root=self.root_folder, split='test',
@@ -178,6 +181,6 @@ class ContrastiveLearningDataset:
                                   self.get_simclr_pipeline_transform(28),
                                   2)]),
                                   download=True)
-        dataset_valid.targets = (dataset_valid.targets.sum(1) != 0).astype(np.int)
+#         dataset_valid.targets = (dataset_valid.targets.sum(1) != 0).astype(np.int)
     
         return dataset_train, dataset_valid#, cls_dist

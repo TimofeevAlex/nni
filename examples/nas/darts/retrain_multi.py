@@ -15,13 +15,11 @@ import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F
 
-import datasets
+import datasets_multi
 import utils
 from utils import accuracy
 from model import CNN
 from focal_loss import FocalLoss
-from torch.utils.data.sampler import SubsetRandomSampler
-from sklearn.model_selection import train_test_split
 
 sys.path.append('../../../nni/nas/pytorch/')
 
@@ -32,8 +30,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from metrics import getAUC, getACC
 
-logger = logging.getLogger('nni')
+np.random.seed(42)
 
+logger = logging.getLogger('nni')
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 writer = SummaryWriter()
@@ -52,7 +51,6 @@ def train(config, train_loader, model, optimizer, criterion, epoch):#, cls_dist)
     model.train()
     losses_ = []
     grad_norm_w = []
-    cls_dist = torch.Tensor([500, 125])
     for step, (x, y) in enumerate(train_loader):
 
         x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True)
@@ -60,8 +58,8 @@ def train(config, train_loader, model, optimizer, criterion, epoch):#, cls_dist)
       
         optimizer.zero_grad()
         logits = model(x)
-        logits += torch.log(1. / cls_dist.to(device).float())
-        y = y.squeeze().long()
+#         logits += torch.log(1. / cls_dist.to(device).float())
+        y = y.to(torch.float32)#.squeeze().long()
         loss = criterion(logits, y)
         losses_.append(loss.item())
         loss.backward()
@@ -107,15 +105,13 @@ def validate(config, valid_loader, model, criterion, epoch, cur_step):#, cls_dis
     y_pred2 = torch.tensor([])
     
     losses_val = []
-    cls_dist = torch.Tensor([500, 125])
     with torch.no_grad():
         for step, (X, y) in enumerate(valid_loader):
-            y = y.squeeze().long()
+            y = y.to(torch.float32)#.squeeze().long()
             X, y = X.to(device, non_blocking=True), y.to(device, non_blocking=True)
             bs = X.size(0)
 
             logits = model(X)
-            logits += torch.log(1. / cls_dist.to(device).float())
             loss = criterion(logits, y)
             losses_val.append(loss.item())
             accuracy = utils.accuracy(logits, y)#topk=(1, 5)
@@ -123,10 +119,10 @@ def validate(config, valid_loader, model, criterion, epoch, cur_step):#, cls_dis
             top1.update(accuracy["acc1"], bs)
             # top5.update(accuracy["acc5"], bs)
             
-            y = y.float().resize_(len(y), 1)
+#             y = y.float().resize_(len(y), 1)
             y_true = torch.cat((y_true, y.detach().cpu()), 0)
             y_pred1 = torch.cat((y_pred1, torch.argmax(logits, 1).detach().cpu()), 0)
-            y_pred2 = torch.cat((y_pred2, nn.Softmax(dim=1)(logits).detach().cpu()))
+            y_pred2 = torch.cat((y_pred2, nn.Sigmoid()(logits).detach().cpu()))
 
             if step % config.log_frequency == 0 or step == len(valid_loader) - 1:
                 print("Valid: [{:3d}/{}] Step {:03d}/{:03d} Loss {losses.avg:.3f} "
@@ -141,31 +137,32 @@ def validate(config, valid_loader, model, criterion, epoch, cur_step):#, cls_dis
     y_true = y_true.numpy()
     y_pred1 = y_pred1.numpy()
     y_pred2 = y_pred2.numpy()
-    auc = getAUC(y_true, y_pred2, 'binary-class') #
-    acc = getACC(y_true, y_pred2, 'binary-class') #
+    auc = getAUC(y_true, y_pred2, 'multi-label, binary-class') #
+    acc = getACC(y_true, y_pred2, 'multi-label, binary-class') #
     print("Valid: [{:3d}/{}] AUC: {:.4%} ACC: {:.4%}".format(epoch + 1, config.epochs, auc, acc))
     # Confusion matrix
-    conf_mat = confusion_matrix(y_true, y_pred1)
+#     conf_mat = confusion_matrix(y_true, y_pred1)
 #     class_labels= ['airplanes', 'cars', 'birds', 'cats', 'deer',\
 #                    'dogs', 'frogs', 'horses', 'ships', 'trucks']
     
-    class_labels = ["Negative", "Positive"]
-    conf_mat = pd.DataFrame(conf_mat, columns=class_labels, index=class_labels)
-    mask = np.ones_like(conf_mat)
-    # mask[np.triu_indices_from(mask)] = False
-    plt.figure(figsize=(10, 10))
-    ax = sns.heatmap(conf_mat, cmap='coolwarm', annot=True)#mask=mask
-    ax.set_xticklabels(ax.get_xticklabels(), rotation=45, horizontalalignment='right')
-    ax.set_yticklabels(ax.get_yticklabels(), rotation=45, horizontalalignment='right')
-    ax.set_title('Confusion matrix heatmap')
-    plt.tight_layout()
-    if config.no_pretrained:
-        if args.not_reinit != 'None':
-            plt.savefig('plots/nossl_confusion_matrix '+config.dataset+'.png')
-        else:
-            plt.savefig('plots/new_weights_nossl_confusion_matrix '+config.dataset+'.png')
-    else:
-        plt.savefig('plots/confusion_matrix '+config.dataset+'.png')
+#     class_labels = ["Negative", "Positive"]
+
+#     conf_mat = pd.DataFrame(conf_mat, columns=class_labels, index=class_labels)
+#     mask = np.ones_like(conf_mat)
+#     # mask[np.triu_indices_from(mask)] = False
+#     plt.figure(figsize=(10, 10))
+#     ax = sns.heatmap(conf_mat, cmap='coolwarm', annot=True)#mask=mask
+#     ax.set_xticklabels(ax.get_xticklabels(), rotation=45, horizontalalignment='right')
+#     ax.set_yticklabels(ax.get_yticklabels(), rotation=45, horizontalalignment='right')
+#     ax.set_title('Confusion matrix heatmap')
+#     plt.tight_layout()
+#     if config.no_pretrained:
+#         if args.not_reinit != 'None':
+#             plt.savefig('plots/nossl_confusion_matrix '+config.dataset+'.png')
+#         else:
+#             plt.savefig('plots/new_weights_nossl_confusion_matrix '+config.dataset+'.png')
+#     else:
+#         plt.savefig('plots/confusion_matrix '+config.dataset+'.png')
     
     
     
@@ -200,41 +197,27 @@ if __name__ == "__main__":
     else:
         model = torch.load(args.pretrained)
     
-    model = nn.Sequential(model, nn.ReLU(), nn.Linear(128, 2)) #dropout
+    model = nn.Sequential(model, nn.ReLU(), nn.Linear(128, 14)) #dropout
 
-    train_dataset, valid_dataset = datasets.get_dataset(args.dataset, cutout_length=4)
-    criterion = FocalLoss(gamma=2.)#nn.CrossEntropyLoss()#nn.BCELoss()#FocalLoss(gamma=2.)##Add alphas
+    dataset_train, dataset_valid = datasets_multi.get_dataset(args.dataset, cutout_length=0)# FIX TO 10%
+    criterion = nn.BCEWithLogitsLoss()#nn.CrossEntropyLoss()#nn.BCELoss()#FocalLoss(gamma=2.)##Add alphas
 
     model.to(device)
     criterion.to(device)
 
-    optimizer = torch.optim.SGD(model.parameters(), 0.025, momentum=0.9, weight_decay=3.0E-4)
-    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.epochs, eta_min=1E-6) 
-#     train_loader = torch.utils.data.DataLoader(dataset_train,
-#                                                batch_size=args.batch_size,
-#                                                shuffle=True,
-#                                                num_workers=args.workers)
-#     valid_loader = torch.utils.data.DataLoader(dataset_valid,
-#                                                batch_size=args.batch_size,
-#                                                shuffle=False,
-#                                                num_workers=args.workers,
-#                                                pin_memory=True)
-
-    dataset_size = len(train_dataset)
-    indices = np.arange(dataset_size)
-    train_indices, val_indices = train_test_split(indices, stratify=[0]*500 + [1]*125,
-                                                  test_size=0.2, random_state=42)
-    np.random.shuffle(train_indices)
-    train_sampler = SubsetRandomSampler(train_indices)
-    valid_sampler = SubsetRandomSampler(val_indices)
-    train_loader = torch.utils.data.DataLoader(train_dataset,
+    optimizer = torch.optim.SGD(model.parameters(), 0.025, momentum=0.9, weight_decay=3.0E-4) #0.025
+    #lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [30, 60], gamma=0.5)    
+    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.epochs, eta_min=1E-6) #reduce on plateau
+    #lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=5, factor=0.5, threshold=0.001) 
+    train_loader = torch.utils.data.DataLoader(dataset_train,
                                                batch_size=args.batch_size,
-                                               sampler=train_sampler,
+                                               shuffle=True,
                                                num_workers=args.workers)
-    valid_loader = torch.utils.data.DataLoader(valid_dataset,
+    valid_loader = torch.utils.data.DataLoader(dataset_valid,
                                                batch_size=args.batch_size,
-                                               sampler=valid_sampler,
-                                               num_workers=args.workers)
+                                               shuffle=False,
+                                               num_workers=args.workers,
+                                               pin_memory=True)
 
     best_top1 = 0.
     try:  

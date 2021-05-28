@@ -126,7 +126,7 @@ class SSLDartsTrainer(Trainer):
             grad_norm_arc.append(total_norm)
             # phase 2: child network step
             self.optimizer.zero_grad()
-            logits, labels, loss = self._logits_and_loss(trn_X)
+            loss = self._logits_and_loss(trn_X)
             loss_w.append(loss.item())
             loss.backward()
             self.optimizer.step()
@@ -145,12 +145,12 @@ class SSLDartsTrainer(Trainer):
                 total_norm = total_norm ** (1. / 2)
             grad_norm_w.append(total_norm)
             
-            metrics = self.metrics(logits, labels)
-            metrics["loss"] = loss.item()
-            meters.update(metrics)
+#             metrics = self.metrics(logits, labels)
+#             metrics["loss"] = loss.item()
+#             meters.update(metrics)
             if self.log_frequency is not None and step % self.log_frequency == 0:
                 print("Epoch [{}/{}] Step [{}/{}]  {}".format(epoch + 1,
-                            self.num_epochs, step + 1, len(self.train_loader), meters))
+                            self.num_epochs, step + 1, len(self.train_loader), loss.item()))
                 
 #                 if (step == rand_step) and (epoch % 5 == 0):
 #                     _, _, loss_x = self._logits_and_loss(val_X)
@@ -174,8 +174,8 @@ class SSLDartsTrainer(Trainer):
                 X = torch.cat(X, dim=0)
                 X = X.to(self.device)
                 features = self.model(X)
-                logits, labels = self.info_nce_loss(features)
-                loss = self.loss(logits, labels)
+#                 logits, labels = self.info_nce_loss(features)
+                loss = self.info_nce_loss(features)#self.loss(logits, labels)
                 losses.append(loss.item())
                 if step == 0:
                     Xs = features[:self.batch_size]
@@ -188,49 +188,72 @@ class SSLDartsTrainer(Trainer):
         return np.mean(losses), Xs.detach().cpu().numpy(), ys.detach().cpu().numpy()
 
     def info_nce_loss(self, features):
-        labels = torch.cat([torch.arange(self.batch_size) for i in range(2)], dim=0)
-        labels = (labels.unsqueeze(0) == labels.unsqueeze(1)).float()
-        labels = labels.to(self.device)
+        z_a, z_b = features[:self.batch_size], features[:self.batch_size] 
+        # normalize repr. along the batch dimension
+        z_a_norm = (z_a - z_a.mean(0)) / z_a.std(0) # NxD
+        z_b_norm = (z_b - z_b.mean(0)) / z_b.std(0) # NxD
 
-        features = F.normalize(features, dim=1)
+        N = z_a.size(0)
+        D = z_a.size(1)
 
-        similarity_matrix = torch.matmul(features, features.T)
-        # assert similarity_matrix.shape == (
-        #     self.args.n_views * self.args.batch_size, self.args.n_views * self.args.batch_size)
-        # assert similarity_matrix.shape == labels.shape
+        # cross-correlation matrix
+        c = torch.mm(z_a_norm.T, z_b_norm) / N # DxD
+        # loss
+        I = torch.eye(D, device=self.device)
+        c_diff = (c - I).pow(2) # DxD
+        # multiply off-diagonal elems of c_diff by lambda
+        c_diff = c_diff * 5e-3 * (torch.ones((D, D), device=self.device) - I)
+        loss = c_diff.sum()
+        return loss
+#         labels = torch.cat([torch.arange(self.batch_size) for i in range(2)], dim=0)
+#         labels = (labels.unsqueeze(0) == labels.unsqueeze(1)).float()
+#         labels = labels.to(self.device)
 
-        # discard the main diagonal from both: labels and similarities matrix
-        mask = torch.eye(labels.shape[0]).bool().to(self.device)
+#         features = F.normalize(features, dim=1)
+
+#         similarity_matrix = torch.matmul(features, features.T)
+#         # assert similarity_matrix.shape == (
+#         #     self.args.n_views * self.args.batch_size, self.args.n_views * self.args.batch_size)
+#         # assert similarity_matrix.shape == labels.shape
+
+#         # discard the main diagonal from both: labels and similarities matrix
+#         mask = torch.eye(labels.shape[0]).bool().to(self.device)
         
-        labels = labels[~mask].view(labels.shape[0], -1)
+#         labels = labels[~mask].view(labels.shape[0], -1)
         
-        similarity_matrix = similarity_matrix[~mask].view(similarity_matrix.shape[0], -1)
-        # assert similarity_matrix.shape == labels.shape
-        # select and combine multiple positives
-        positives = similarity_matrix[labels.bool()].view(labels.shape[0], -1)
+#         similarity_matrix = similarity_matrix[~mask].view(similarity_matrix.shape[0], -1)
+#         # assert similarity_matrix.shape == labels.shape
+#         # select and combine multiple positives
+#         positives = similarity_matrix[labels.bool()].view(labels.shape[0], -1)
 
-        # select only the negatives the negatives
-        negatives = similarity_matrix[~labels.bool()].view(similarity_matrix.shape[0], -1)
+#         # select only the negatives the negatives
+#         negatives = similarity_matrix[~labels.bool()].view(similarity_matrix.shape[0], -1)
 
-        logits = torch.cat([positives, negatives], dim=1)
-        labels = torch.zeros(logits.shape[0], dtype=torch.long).to(self.device)
+#         logits = torch.cat([positives, negatives], dim=1)
+#         labels = torch.zeros(logits.shape[0], dtype=torch.long).to(self.device)
 
-        logits = logits / self.temperature
-        return logits, labels
+#         logits = logits / self.temperature
+#         return logits, labels
     
     def _logits_and_loss(self, X):
         self.mutator.reset()
 
         features = self.model(X)
-        logits, labels = self.info_nce_loss(features)
-        loss = self.loss(logits, labels)
+#         logits, labels 
+        loss = self.info_nce_loss(features)
+#         loss = self.loss(logits, labels)
         self._write_graph_status()
-        return logits, labels, loss
+        return loss
 
     def _backward(self, val_X):
         """
         Simple backward with gradient descent
         """
-        _, _, loss = self._logits_and_loss(val_X)
+        loss = self._logits_and_loss(val_X)
+        params = torch.Tensor([]).to(self.device)
+        for param in self.mutator.choices.values():
+            params = torch.cat((params, torch.sigmoid(param)))
+            loss_0_1 = -F.mse_loss(params, torch.tensor(0.5, requires_grad=False).to(self.device))
+        loss += loss_0_1
         loss.backward()
         return loss
